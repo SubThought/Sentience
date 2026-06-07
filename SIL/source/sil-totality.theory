@@ -1,0 +1,890 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;; *************************************************************************************
+;;;
+;;; sil-totality.theory version 001 — Shared knowledge base for the SIL system.
+;;;
+;;; Derived from GIL totality_005.theory.  Adaptations for the computational domain:
+;;;
+;;;   - Potentiation windows rescaled from milliseconds to minutes/hours/days
+;;;   - SIL-specific Registry entries (budgets, thresholds, exploration)
+;;;   - Modalities changed: Visual/Auditory/… → Textual/Tabular/Metric/…
+;;;   - Physical image schemas removed (Tone, Rhythm, Pressure, etc.)
+;;;   - Computational image schemas retained (Container, Path, Above, etc.)
+;;;   - Recognized element relations added (Dataset, CodePattern, etc.)
+;;;   - Device template adapted for Computational-Workbench
+;;;   - Imaginative memory adapted for execution simulation (Canvas, Taxis, etc.)
+;;;
+;;; All ontological, activative, associative, and control memory structures
+;;; are inherited unchanged from GIL — they are domain-independent.
+;;;
+
+
+(module SIL-Totality
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §1   CONTROL MEMORY
+  ; ─────────────────────────────────────────────────────────────
+
+  (require Registry from "locus://sol.earth.orb/local.host/home/mike/ontology/code/registry.th")
+
+
+  (relation Registry
+    :Key   nil
+    :Value 0
+    :Memo  nil
+  )
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; Potentiation windows — RESCALED for SIL
+  ;
+  ; SIL operates on minutes/hours/days, not milliseconds.
+  ; One Moment ≈ 0.0315576 seconds  (nano-year, 16-digit clock).
+  ;
+  ;   ActivationWindow       9500       ~  5 min
+  ;   ForgettingWindow       2764800    ~ 24 hr
+  ;   ImmediatePotentiation  1900       ~  1 min
+  ;   ShortTermPotentiation  57000      ~ 30 min
+  ;   MidTermPotentiation    912000     ~  8 hr
+  ;   LongTermPotentiation   19353600   ~  7 days
+  ;   ExtendedPotentiation   82944000   ~ 30 days
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (put (knew Registry :Key ActivationWindow)      :Value 9500      :Memo "Moments scheme is active (~ 5 min)")
+  (put (knew Registry :Key ForgettingWindow)      :Value 2764800   :Memo "Moments before forgotten (~ 24 hr)")
+  (put (knew Registry :Key ImmediatePotentiation) :Value 1900      :Memo "Moments for actuations and percepts (~ 1 min)")
+  (put (knew Registry :Key ShortTermPotentiation) :Value 57000     :Memo "Moments for events and execution results (~ 30 min)")
+  (put (knew Registry :Key MidTermPotentiation)   :Value 912000    :Memo "Moments for episodes / full generations (~ 8 hr)")
+  (put (knew Registry :Key LongTermPotentiation)  :Value 19353600  :Memo "Moments for lessons and strategies (~ 7 days)")
+  (put (knew Registry :Key ExtendedPotentiation)  :Value 82944000  :Memo "Moments for maxims, theories, and cross-task wisdom (~ 30 days)")
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; SIL-specific Registry entries
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (put (knew Registry :Key MaxGenerationsPerRun)          :Value 5       :Memo "Default generation cap per run")
+  (put (knew Registry :Key AccuracyTargetDefault)         :Value 70      :Memo "Default homeostatic target for Accuracy (percentage)")
+  (put (knew Registry :Key APIBudgetDefault)              :Value 1000000 :Memo "Default token budget per run")
+  (put (knew Registry :Key TimeBudgetDefault)             :Value 114000  :Memo "Default wall-clock budget (~ 60 min in Moments)")
+  (put (knew Registry :Key MinReliabilityForReaction)     :Value 80      :Memo "Action must exceed this (pct) for Reactor selection")
+  (put (knew Registry :Key MinSimilarityForCaseMatch)     :Value 60      :Memo "Matcher threshold for Case retrieval (pct)")
+  (put (knew Registry :Key MaxConcurrentCanvases)         :Value 4       :Memo "How many daydreams can run at once")
+  (put (knew Registry :Key EarlyStopPatienceGenerations)  :Value 3       :Memo "Generations without improvement before Compensator triggers")
+  (put (knew Registry :Key ExplorationProbability)        :Value 15      :Memo "Chance Explorer overrides Deliberator (pct)")
+  (put (knew Registry :Key PsychePollInterval)            :Value 160     :Memo "Moments between Psyche polls (~ 5 sec)")
+
+
+  ; Actor
+
+  (relation Actor
+    :Name   nil
+    :Url    nil
+    :Kind   nil
+    :Status nil
+    :Cycle  0
+    :Moment 0
+  )
+
+
+  ; Codes — lookup table of reifier-to-code-set mappings with memos.
+
+  (relation Codes
+    :M       0     ; reifier for this code entry
+    :CodeSet nil   ; code set name symbol
+    :Memo    nil   ; human-readable description
+  )
+
+
+  ; Looping enumeration
+
+  (enumeration Looping
+    Once   1
+    Repeat
+    Until
+    While
+  )
+
+  ; Loop — iteration control record
+
+  (relation Loop
+    :M
+    :Looping
+    :Count
+    :Tries    0
+    :Watch
+  )
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §2   ONTOLOGICAL MEMORY
+  ;
+  ; Inherited unchanged from GIL — these are domain-independent.
+  ; ─────────────────────────────────────────────────────────────
+
+  (relation Belief
+    :M    0
+    :Viewpoint  nil
+    :Salience   0
+    :Certainty  0
+    :Likelihood 0
+    :Likeliest  {}
+    :Coherence  0
+    :Belief     nil
+    :Diametric  nil
+    :Moment     0
+  )
+
+  (relation Emotion
+    :M  0
+    :Valence  0
+    :Arousal  0
+  )
+
+  (relation Need
+    :Name    nil
+    :M 0
+    :Delta   0
+  )
+
+  (relation Usage
+    :M  0
+    :Count    1
+  )
+
+  (relation Utility
+    :M    0
+    :Attempts   0
+    :Successes  0
+  )
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; RELATIONSHIPS  (identical to GIL)
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (enumeration Relationships
+
+    Awareness   0
+    Relation    1
+
+    ; Observables
+    Feature   100000
+    Result
+    Percept
+    Urge
+
+    ; Images  (spatial/structural schemas)
+    Above   110000
+    Across
+    Apart
+    Behind
+    Beside
+    Boundary
+    Contact
+    Container
+    Path
+    Together
+
+    ; Localization
+    Scene   120000
+    Venue
+    Locale
+    Place
+    Area
+    Region
+    Map
+
+    ; Simple
+    Genus   130000
+    Grounding
+    Member
+    Tandem
+    Slot
+    Swap
+    Symbolism
+
+    ; Vertical
+    Different   140000
+    Equivalent
+    Identical
+    Incompatible
+    Similar
+
+    ; Gates
+    Category   150000
+    Choice
+    League
+    Ordering
+    Unison
+    Series
+
+    ; Loops
+    Once   160000
+    Repeat
+    Until
+    While
+
+    ; Structures
+    Idea   170000
+    Prototype
+    Class
+    Concept
+
+    ; Abstractions / Derivatives
+    Hypothesis   180000
+    Causes
+    Implies
+    Refuter
+    Sign
+    Symbol
+    Metaphor
+    Analogy
+    Entity
+    Statement
+    Utterance
+    Situation
+    Event
+    Episode
+    Frame
+    Story
+    Dream
+    Objective
+    Actuation
+    Action
+    Operation
+    Reason
+    Believes
+    Desires
+    Intends
+    Obstacle
+    Contradiction
+    Gap
+    Lacuna
+    Novelty
+    Lesson
+    Theme
+    Maxim
+    Theory
+
+    ; Schema Slots
+    :Slots 190000
+    :Context
+    :Goals
+    :Loop
+    :Result
+    :Premises
+    :Known
+    :Lemmas
+    :Proof
+    :Theorem
+
+    ; Control
+    Viewpoint 900000
+
+    ; Self-created relations start here
+    Autogenous 1000000
+  )
+
+
+  ; REIFIERS
+
+  (let ?*REIFIERS* (long (enum Relationships Autogenous)))
+
+  (function reifiers {} returns long  ?*REIFIERS*)
+
+  (function reifier {+ ?arg 1} returns long
+    (critical { GLOBAL-MONAD-UPDATE }
+      (if (taxon-p ?arg number)
+          (step ?i from 1 to ?arg
+            (new Usage :M (++ ?*REIFIERS*)))
+       or (= ?arg reset)
+          (set ?*REIFIERS* (long (enum Relationships Autogenous))))
+      ?*REIFIERS*))
+
+
+  ; GLUE
+  ;
+  ; Tier regions  (bottom to top):
+  ;   Perceptual  — Percept · Feature
+  ;   Conceptual  — Entity · Event
+  ;   Episodic    — Episode
+  ;   Behavioral  — Action · Objective
+  ;   Operational — Operation · Theory
+
+  (relation Glue
+    :M       0
+    :X       0
+    :Y       0
+    :Z       0
+    :Point   {0 0 0}
+    :Disp    0.1
+    :Temp    0
+  )
+
+  (new Glue :M (enum Relationships Awareness))
+
+
+  ; TOTALITY
+
+  (put Registry   "Totality/CellsPerUnit"   7
+                  "Totality/ResizeThreshold" 0.2)
+
+  (relation Totality
+    :MinX 0  :MinY 0  :MinZ 0
+    :MaxX 0  :MaxY 0  :MaxZ 0
+    :MaxT  0.1
+    :Chill 0.8
+
+    !bounds (method {}
+              (bind ?me :MinX ?minX :MinY ?minY :MinZ ?minZ
+                        :MaxX ?maxX :MaxY ?maxY :MaxZ ?maxZ)
+              {{?minX ?minY ?minZ} {?maxX ?maxY ?maxZ}}))
+
+
+  ; LEXEMES
+
+  (enumeration Totalities
+    Actual
+    Virtual
+  )
+
+  (relation Lexeme
+    :Totality nil
+    :M        0
+    :Label    nil
+  )
+
+  (function lexify {?label + ?totality = Actual}
+    (if (taxon-p ?label number) (return ?label))
+    (critical { GLOBAL-LEXEME-CREATION }
+      (let ?reifier
+        (with [Lexeme :Totality = ?totality :Label = ?label :M as ?reifier]
+          give ?reifier))
+      (if (thing-p ?reifier) (return ?reifier))
+      (let ?reifier (reifier))
+      (new Lexeme :Totality ?totality :Label ?label :M ?reifier)
+      (return ?reifier)))
+
+
+  ; SCHEMES
+
+  (relation Argument
+    :A
+    :R
+    :M
+  )
+
+  (relation Referent
+    :E
+    :R
+    :M
+  )
+
+  (function relate {long ?reifier long ?relation list ?arguments list ?referents}
+    (critical { GLOBAL-TERM-CREATION }
+      (for ?a in ?arguments
+        (knew Argument :M ?reifier :R ?relation :A ?a))
+      (for ?e in ?referents
+        (knew Referent :M ?reifier :R ?relation :E ?e))))
+
+  (relation Relation
+    :R
+  )
+
+  (relation S
+    :M
+    :R
+    :A         {}
+    :E         {}
+    :L
+  )
+
+  (function make {% ?relation  = nil
+                    ?arguments = nil
+                    ?referents = nil}
+    returns long
+    (critical { GLOBAL-SCHEME-CREATION }
+      (let ?reifier      (reifier)
+           ?relationship (on (or (null-p  ?relation)
+                                 (taxon-p ?relation number))
+                             ?relation
+                             (lexify ?relation))
+           ?arglist      (map ?arguments lexify)
+           ?reflist      (map ?referents lexify))
+      (relate ?reifier ?relationship ?arguments ?referents)
+      (new S
+        :M  ?reifier
+        :R  ?relationship
+        :A  ?arglist
+        :E  ?reflist)
+      ?reifier))
+
+
+  ; MERGES
+
+  (enumeration Merges
+    ONE
+    PASS
+    NOT
+    AND
+    SEQ
+    OR
+    NOR
+    VOTE
+  )
+
+  (relation Merging
+    :R
+    :Merge
+  )
+
+  (new Merging :R (lexify Category) :Merge (lexify Or))
+  (new Merging :R (lexify Choice)   :Merge (lexify One))
+  (new Merging :R (lexify League)   :Merge (lexify Vote))
+  (new Merging :R (lexify Ordering) :Merge (lexify Or))
+  (new Merging :R (lexify Unison)   :Merge (lexify And))
+  (new Merging :R (lexify Series)   :Merge (lexify Seq))
+
+
+  ; SCHEMATA  (schema, template, copy-schema, make-schema — same as GIL)
+  ;
+  ; Elided for brevity — uses identical functions from GIL totality.
+  ; In production, copy the full schema machinery from totality_005.
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; TEMPLATES  (identical to GIL — domain-independent)
+  ; ─────────────────────────────────────────────────────────────
+
+  ; Simple Relationships
+  (template Genus       { :Mesa nil :Meta nil })
+  (template Grounding   { :Associates {} :Percept nil })
+  (template Member      { :Genus nil :Example nil })
+  (template Slot        { :Category nil :Element nil })
+  (template Swap        { :Original nil :Proxy nil })
+  (template Symbolism   { :Signifier nil :Signified nil })
+  (template Tandem      { :Prior nil :Later nil })
+
+  ; Vertical Relationships
+  (template Different      { :Members nil :Categories nil })
+  (template Incompatible   { :Members nil :Categories nil })
+  (template Similar        { :Members nil :Categories nil :Traits nil })
+  (template Equivalent     { :Members nil :Categories nil })
+  (template Identical      { :Members nil :Categories nil })
+
+  ; Gate Relationships
+  (template Category       { :Elements {} })
+  (template Choice         { :Elements {} })
+  (template League         { :Elements {} })
+  (template Ordering       { :Elements {} })
+  (template Unison         { :Elements {} })
+  (template Series         { :Elements {} })
+
+  ; Structural Relationships
+  (template Idea           { :Slots {} })
+  (template Prototype      { :Categories {} })
+  (template Class          { :Genus {} :Kinds {} :Categories {} :Traits {} :Members {} })
+  (template Concept        { :Elements {} })
+
+  ; Derivative Relationships
+
+  (enumeration Supports  open  confirmed  disconfirmed)
+
+  (template Hypothesis   { :Premise nil :Surmise nil :Support open :Confidence 0 })
+  (template Causes       { :Premise nil :Surmise nil })
+  (template Implies      { :Premise nil :Surmise nil })
+  (template Refuter      { :Genus nil :Example nil })
+  (template Sign         { :Signifier nil :Signified nil })
+  (template Symbol       { :Signifier nil :Signified nil :Similarity nil })
+  (template Metaphor     { :Signifier nil :Signified nil :Similarity nil })
+  (template Event        { :Slots {} })
+  (template Analogy      { :Swaps {} })
+  (template Entity       { :Elements {} })
+  (template Situation    { :Elements {} })
+  (template Statement    { :Elements {} })
+  (template Desideratum  { :Elements {} })
+  (template Intention    { :Elements {} })
+  (template Episode      { :Events {} })
+  (template Frame        { :R nil :Categories nil :Scenarios nil })
+
+  (template Action
+    {
+      :Context     {}
+      :Goals       {}
+      :Loop        nil
+      :Result      {}
+      :Reliability 0
+      :Composite   no
+    })
+
+  (template Reason
+    {
+      :Premises   {}
+      :Known      {}
+      :Lemmas     {}
+      :Proof      {}
+      :Theorem    {}
+    })
+
+  (template Actuation    { :Method nil :Params nil })
+  (template Operation    { :Method nil :Params nil })
+  (template Problem      { :Context {} :Desired {} })
+  (template Lacuna       { :Premises {} :Desiderata {} })
+
+  (enumeration Origins  Ascribed  Empirical  Logical)
+
+  (template Theme        { :Elements {} :Origin nil })
+  (template Maxim        { :Theme nil :Reason nil :Advice nil })
+  (template Theory       { :Elements {} })
+  (template Obstacle     { :Before {} :During {} :Expected {} :Actual {} })
+  (template Contradiction { :Classes {} :Traits {} })
+  (template Lesson       { :Problem nil :Solution nil :Outcome nil })
+
+  (template Experiment   { :Hypothesis nil :Setup {} :Action nil :Status pending })
+  (template Prediction   { :Hypothesis nil :Deadline 0 :Outcome pending :Moment 0 })
+  (template Shock        { :Trial nil :Effect {} :Moment 0 })
+  (template Serendipity  { :Trial nil :Effect {} :Moment 0 })
+
+  (template Simulation   { :Status idle :Current {} :Objective nil })
+  (template Supposition  { :Simulation nil :Assumption {} :Forward {} })
+  (template Appraisal    { :Objective nil :Valence 0 :Arousal 0 :Likelihood 0 :Moment 0 })
+  (template Affect       { :Appraisals {} :Valence 0 :Arousal 0 :Moment 0 })
+  (template Mood         { :Affects {} :Valence 0 :Arousal 0 :Window 0 })
+
+  (enumeration Coping  reappraise  distract  ask-help  solve)
+
+  (template Response     { :Appraisal nil :Emotion nil :CopingMethod nil })
+  (template Experience   { :Action nil :Start 0 :End 0 :Status pending })
+  (template Fault        { :Actor nil :Description nil :Moment 0 })
+  (template Ping         { :Actor nil :Url nil :Sent 0 :Timeout 0 })
+  (template Pong         { :Actor nil :Ping nil :Moment 0 })
+  (template Throttle     { :Actor nil :Direction nil :Factor 0 :Moment 0 })
+  (template Directive    { :From nil :To nil :Reason nil :Moment 0 })
+  (template Observable   { :Modality nil :Channel nil :Data nil :Address nil :Moment 0 })
+  (template Capability   { :Action nil :Enabled yes :Moment 0 })
+  (template Possibility  { :Happening nil :Action nil :Result {} :Moment 0 })
+
+  (template Reward
+    {
+      :Attempt   nil
+      :Action    nil
+      :Objective nil
+      :Value     0
+      :Moment    0
+    })
+
+  (template Achieved     { :Objective nil :Happening nil :Moment 0 })
+  (template Recognition  { :Model nil :Schemes {} :Strength 0 :Moment 0 })
+  (template Trial        { :Action nil :Status pending :Moment 0 })
+
+  (enumeration Drives  life  play)
+
+  (template Objective
+    {
+      :Drive    life
+      :Need     nil
+      :Context  {}
+      :Goals    {}
+      :Result   {}
+      :Priority 0
+      :Status   active
+      :Moment   0
+    })
+
+  ; Discovery registry thresholds
+  (put (knew Registry :Key UnisonHypothesisThreshold)          :Value 10  :Memo "Unison co-occurrences needed")
+  (put (knew Registry :Key TandemHypothesisThreshold)          :Value 5   :Memo "Tandem sequentials needed")
+  (put (knew Registry :Key LogicalHypothesisThreshold)         :Value 3   :Memo "Logical inferences needed")
+  (put (knew Registry :Key PlausibleHypothesisThreshold)       :Value 2   :Memo "Problem solving episodes needed")
+  (put (knew Registry :Key HypothesisDecayRate)                :Value 9500 :Memo "Moments without reinforcement before decay (~5 min)")
+  (put (knew Registry :Key HypothesisConfirmationThreshold)    :Value 5   :Memo "Confirmed predictions needed")
+  (put (knew Registry :Key HypothesisDisconfirmationThreshold) :Value 3   :Memo "Failed predictions needed")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §3   ACTIVATIVE MEMORY  (identical to GIL)
+  ; ─────────────────────────────────────────────────────────────
+
+  (enumeration Realities
+    Observed
+    Desired
+    Expected
+    Possible
+    Attained
+    Confirmed
+    Imagined
+    Recalled
+  )
+
+  (relation Viewpoint
+    :Viewpoint
+  )
+
+  (new Viewpoint :M (var ?*DEFAULT-VIEWPOINT* (make) :Key default))
+
+  (function GENERAL-AWARENESS {} ?*DEFAULT-VIEWPOINT*)
+
+  (relation Activation
+    :Viewpoint       (GENERAL-AWARENESS)
+    :M         0
+    :Reality         nil
+    :EnabledSince    0
+    :EnabledUntil    0
+    :ImpededSince    0
+    :ImpededUntil    0
+    :Pulses          0
+    :Merge           nil
+    :ArgumentQuorum  0
+    :ReferentQuorum  0
+    :WhichArgument   0
+    :WhichReferent   0
+    :TotalArguments  0
+    :TotalReferents  0
+    :Activation      nil
+    :Antipode        nil
+  )
+
+  (function enable {% list ?reifiers moment ?moment long ?viewpoint = nil literal ?reality = nil}
+    (critical { GLOBAL-ACTIVATION-MODIFICATION }
+      (let ?reality (default ?reality Observed)
+           ?vp      (default ?viewpoint (GENERAL-AWARENESS))
+           ?pulses  1)
+      (for ?reifier in ?reifiers
+        (let ?a (knew Activation :M ?reifier :Viewpoint ?vp :Reality ?reality)
+                     :Pulses ?pulses :EnabledSince ?moment :EnabledUntil ?moment)
+        (on (< ?pulses 1)
+            (put ?a :Pulses  1 :EnabledSince ?moment :EnabledUntil ?moment :ImpededUntil ?moment)
+            (put ?a :Pulses (++ ?pulses) :EnabledUntil ?moment)))))
+
+  (function impede {% list ?reifiers moment ?moment long ?viewpoint = nil literal ?reality = nil}
+    (critical { GLOBAL-ACTIVATION-MODIFICATION }
+      (let ?reality (default ?reality Observed)
+           ?vp      (default ?viewpoint (GENERAL-AWARENESS))
+           ?pulses  1)
+      (for ?reifier in ?reifiers
+        (let ?a (knew Activation :M ?reifier :Viewpoint ?vp :Reality ?reality)
+                     :Pulses ?pulses :ImpededSince ?moment :ImpededUntil ?moment)
+        (on (> ?pulses -1)
+            (put ?a :Pulses  -1 :ImpededSince ?moment :ImpededUntil ?moment :EnabledUntil ?moment)
+            (put ?a :Pulses (-- ?pulses) :ImpededUntil ?moment)))))
+
+  (relation Attempt
+    :Agendum
+    :Activation
+    :Action     nil
+    :Status     nil
+    :Moment     0
+  )
+
+  (relation Agenda
+    :Agendum
+  )
+
+  (relation Happening
+    :Schemes  {}
+    :Moment   0
+  )
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §4   PERCEPTUAL MEMORY  — ADAPTED FOR COMPUTATIONAL DOMAIN
+  ; ─────────────────────────────────────────────────────────────
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; SIL Modalities — sense modalities of a computational workbench
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (enumeration Modalities
+    Textual       ; text file contents (task.md, source code, prompts)
+    Tabular       ; structured data (CSV rows, JSON objects)
+    Metric        ; numeric measurements (accuracy, token count, duration)
+    Diagnostic    ; error signals (exit codes, stack traces, warnings)
+    Structural    ; filesystem state (files present, directory layout)
+    Temporal      ; timing signals (generation duration, API latency)
+  )
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; Recognized elements — SIL equivalents of Object/Shape/Icon/Geon
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (relation Dataset         ; recognized from Tabular/Structural percepts
+    :M
+    :Format      nil        ; csv | json | parquet | text
+    :Rows        0          ; row count
+    :Columns     {}         ; set of column name symbols
+    :Language    nil         ; natural language of text content
+    :HasLabels   no         ; yes | no
+  )
+
+  (relation CodePattern     ; recognized from Textual percepts (source code)
+    :M
+    :Pattern     nil        ; import-sklearn | for-loop | batch-api-call | …
+    :Source      nil         ; file path
+  )
+
+  (relation ScoreProfile    ; recognized from Metric percepts
+    :M
+    :Metric      nil        ; accuracy | f1 | rmse | exact-match
+    :Value       0          ; the numeric value
+    :Baseline    0          ; baseline for this metric
+    :Target      0          ; task-specified target
+    :Gap         0          ; target - value
+  )
+
+  (relation ErrorSignature  ; recognized from Diagnostic percepts
+    :M
+    :Type        nil        ; crash | timeout | rate-limit | parse-error | missing-dep
+    :Message     nil        ; error message string
+    :Recoverable nil        ; yes | no
+  )
+
+
+  ; Raw Percept
+
+  (relation Percept
+    :Modality
+    :Channel
+    :Address  nil
+    :Data     nil
+    :Content  nil
+    :Moment   0
+  )
+
+  (relation Result
+    :Action
+    :Status nil
+    :Moment 0
+  )
+
+  (relation Urge
+    :M
+    :Need   nil
+    :Delta  0
+    :Moment 0
+  )
+
+  (enumeration Execution
+    Idle
+    Sent
+    Wait
+    Late
+    Fail
+    Warn
+    Done
+  )
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; Device — computational workbench
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (relation Device
+    :Name           ; device name symbol
+    :Type           ; Computational-Workbench
+    :Address        ; https:// base URL of device Psyche REST API
+    :Needs      {}  ; homeostatic variable symbols
+    :Actuations {}  ; actuation symbols
+    :Token      nil ; opaque registration token
+    :Executor   nil ; URL of Executor service
+    :Perceiver  nil ; URL of Perceiver service
+  )
+
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; IMAGE SCHEMAS — computational domain
+  ;
+  ; Retained from GIL (apply metaphorically):
+  ;   Above, Apart, Boundary, Container, Path, Together
+  ;
+  ; Added for SIL:
+  ;   Series  (sequential steps in a pipeline)
+  ;
+  ; Removed from GIL (physical-only):
+  ;   Across, Behind, Beside, Contact
+  ;   Tone, Rhythm, Phoneme, Utterance
+  ;   Texture, Pressure, Grasp
+  ;   Posture, Gesture, Stiffness, Reach
+  ;   Orientation, Balance, Velocity, Trajectory
+  ;   Proximity, Clearance, Approach, Recession
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (template Above       { :Under nil :Over nil })
+  (template Apart       { :Members {} })
+  (template Boundary    { :Region nil :Limiter nil })
+  (template Container   { :Interior nil :Exterior nil })
+  (template Path        { :Source nil :Target nil })
+  (template Together    { :Members {} })
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §5   ASSOCIATIVE MEMORY  (identical to GIL)
+  ; ─────────────────────────────────────────────────────────────
+
+  (relation Case
+    :Case
+    :R
+    :Content  0
+    :Traits   {}
+  )
+
+  (relation Trait
+    :Trait
+    :R
+    :Case
+  )
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §6   IMAGINATIVE MEMORY — ADAPTED FOR EXECUTION SIMULATION
+  ; ─────────────────────────────────────────────────────────────
+
+  ; Canvas — one hypothetical scenario to simulate
+
+  (relation Canvas
+    :M
+    :Label      nil       ; description symbol
+    :Status     nil       ; drafting | simulating | concluded
+    :Moment     0
+  )
+
+  ; Taxis — the arrangement of elements on a canvas
+
+  (relation Taxis
+    :Canvas               ; which canvas
+    :Action     nil       ; Action being mentally tried
+    :Dataset    nil       ; Dataset percept being reasoned about
+    :Objective  nil       ; Objective being pursued
+    :Constraints {}       ; Boundary schemas in effect
+  )
+
+  ; Vantage — the evaluation perspective
+
+  (relation Vantage
+    :Taxis
+    :Metric     nil       ; which metric to predict
+    :Baseline   0         ; current known value
+  )
+
+  ; Animation — the predicted sequence of events
+
+  (relation Animation
+    :Taxis
+    :Steps      {}        ; Series of predicted step outcomes
+    :Duration   0         ; predicted time in Moments
+    :FinalState {}        ; predicted Result unison
+  )
+
+
+) ; end module SIL-Totality
+
+;;; end theory SIL-Totality

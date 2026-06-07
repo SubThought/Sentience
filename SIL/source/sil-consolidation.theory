@@ -1,0 +1,212 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;; *************************************************************************************
+;;;
+;;; sil-consolidation.theory version 001
+;;;
+;;; Derived from GIL consolidation_004.theory.
+;;; Timing rescaled for SIL:
+;;;   @m5000   →  @m150000   (~ 80 min)   Amneator cycle
+;;;   @m10000  →  @m300000   (~ 2.6 hr)   Automator cycle
+;;;   @m15000  →  @m450000   (~ 4 hr)     Compressor cycles
+;;;
+;;; Patterns:   Forgetting · Automaticity · Compression
+;;;
+
+
+(module SIL-Consolidation
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §1  CONSOLIDATION RELATIONS
+  ; ─────────────────────────────────────────────────────────────
+
+  (relation Compression
+    :Sources {}
+    :Result  nil
+    :Kind    nil
+    :Moment  0
+  )
+
+  (relation Substructure
+    :Schemes {}
+    :Count   0
+    :MDL     0
+    :Moment  0
+  )
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §2  CONSOLIDATION REGISTRY ENTRIES  (rescaled)
+  ; ─────────────────────────────────────────────────────────────
+
+  (put (knew Registry :Key ImmediateDiscardWindow)
+    :Value 9500
+    :Memo "Moments after which zero-usage scheme is discarded (~5 min)")
+
+  (put (knew Registry :Key EventualDiscardWindow)
+    :Value 2764800
+    :Memo "Moments after which low-usage scheme is discarded (~24 hr)")
+
+  (put (knew Registry :Key LowUsageThreshold)
+    :Value 3
+    :Memo "Usage count below which scheme is low-usage")
+
+  (put (knew Registry :Key AutomaticityCountThreshold)
+    :Value 3
+    :Memo "Sequence observations before composite Action formed (fewer than GIL)")
+
+  (put (knew Registry :Key AutomaticityReliabilityThreshold)
+    :Value 75
+    :Memo "Reliability pct before composite Action formed")
+
+  (put (knew Registry :Key SimilarityThreshold)
+    :Value 85
+    :Memo "Jaccard similarity pct before compression")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §3  FORGETTING
+  ; ─────────────────────────────────────────────────────────────
+
+  ; AMNEATOR — forgetting agent
+
+  (agent Amneator
+    (function {}
+      (var ?now  (moment))
+      (var ?iwin (with [Registry :Key ImmediateDiscardWindow :Value as ?v] give ?v))
+      (var ?ewin (with [Registry :Key EventualDiscardWindow  :Value as ?v] give ?v))
+      (var ?low  (with [Registry :Key LowUsageThreshold      :Value as ?v] give ?v))
+
+      ; Pass 1 — recent schemes with zero usage
+      (with [Activation :Pulses as ?p :EnabledUntil as ?eu :M as ?r]
+            [Usage :M = ?r :Count as ?uc]
+            (and (= ?p 0) (< (- ?now ?eu) ?iwin) (= ?uc 0))
+        do (old (this)))
+
+      ; Pass 2 — old schemes with low usage
+      (with [Activation :Pulses as ?p :EnabledUntil as ?eu :M as ?r]
+            [Usage :M = ?r :Count as ?uc]
+            (and (= ?p 0) (> (- ?now ?eu) ?ewin) (< ?uc ?low))
+        do (old (this)))
+
+      ; Forget disconfirmed Hypotheses
+      (with [Hypothesis :Support disconfirmed :Confidence as ?c]
+            (= ?c 0)
+        do (old (this)))
+
+      ; Forget resolved Predictions
+      (with [Prediction :Outcome as ?out]
+            (/= ?out pending)
+        do (old (this))))
+    "https://localhost/mind/amneator"
+    (function {?sender ?msg} told)
+    \@m150000)
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §4  AUTOMATICITY
+  ; ─────────────────────────────────────────────────────────────
+
+  ; AUTOMATOR — compresses reliable Action sequences into composites
+
+  (agent Automator
+    (function {}
+      (var ?cnt-threshold
+        (with [Registry :Key AutomaticityCountThreshold :Value as ?v] give ?v))
+      (var ?rel-threshold
+        (/ (with [Registry :Key AutomaticityReliabilityThreshold :Value as ?v] give ?v) 100))
+
+      ; Step 1 — record sequential Trial pairs
+      (with [Trial :Status Done :Action as ?a1 :Moment as ?t1]
+            [Trial :Status Done :Action as ?a2 :Moment as ?t2]
+            [S :M = ?a1 :R = (lexify Action) as ?s1]
+            [S :M = ?a2 :R = (lexify Action) as ?s2]
+            (and (/= ?a1 ?a2)
+                 (< (abs (- ?t1 ?t2)) 57000)
+                 (= (:E ?s1) (:A ?s2)))
+        do
+        (var ?series
+          (with [Series :First = ?a1 :Second = ?a2 as ?s] give ?s))
+        (on (null-p ?series)
+            (new Series :First ?a1 :Second ?a2 :Count 1)
+            (set ?series :Count (+ (:Count ?series) 1))))
+
+      ; Step 2 — compress reliable sequences
+      (with [Series :Count as ?cnt :First as ?a1 :Second as ?a2]
+            [S :M = ?a1 as ?s1]
+            [S :M = ?a2 as ?s2]
+            (> ?cnt ?cnt-threshold)
+        do
+        (var ?composite
+          (make :relation Action
+                :arguments (:A ?s1)
+                :referents (:E ?s2)))
+        (new Compression
+          :Sources {?a1 ?a2}
+          :Result  ?composite
+          :Kind    automaticity
+          :Moment  (moment))
+        (old (this))))
+    "https://localhost/mind/automator"
+    (function {?sender ?msg} told)
+    \@m300000)
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §5  COMPRESSION
+  ; ─────────────────────────────────────────────────────────────
+
+  ; COMPRESSOR — Jaccard similarity-based compression
+
+  (agent Compressor
+    (function {}
+      (var ?threshold
+        (/ (with [Registry :Key SimilarityThreshold :Value as ?v] give ?v) 100))
+      (with [S :R = (lexify Category) :A as ?a1 :M as ?r1]
+            [S :R = (lexify Category) :A as ?a2 :M as ?r2]
+            (/= ?r1 ?r2)
+            (> (/ (count (intersect ?a1 ?a2))
+                  (count (union     ?a1 ?a2))) ?threshold)
+        do
+        (make :relation Similar :arguments {?r1} :referents {?r2})
+        (new Compression
+          :Sources {?r1 ?r2}
+          :Result  (lexify Similar)
+          :Kind    similarity
+          :Moment  (moment))))
+    "https://localhost/mind/compressor"
+    (function {?sender ?msg} told)
+    \@m450000)
+
+
+  ; Opportunistic rules
+
+  (rule MarkVoid
+    salience 10
+    with [Activation :M as ?r :Pulses as ?p :EnabledUntil as ?eu]
+         [Registry   :Key ImmediateDiscardWindow :Value as ?iwin]
+         (and (= ?p 0) (> (- (moment) ?eu) ?iwin))
+    do
+    (with [Usage :M = ?r as ?u]
+      do (set ?u :Count 0)))
+
+
+  ; consolidate — returns SIL Consolidation mechanism set
+
+  (function consolidate
+    (inside
+      (map
+        {
+          Amneator
+          Automator
+          Compressor
+        }
+        (given {?m} (call start ?m)))))
+
+
+) ; end module SIL-Consolidation
+
+;;; end theory SIL-Consolidation

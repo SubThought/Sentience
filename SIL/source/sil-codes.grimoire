@@ -1,0 +1,90 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;; *************************************************************************************
+;;;
+;;; sil-codes.grimoire — Code set lookup tables for SIL
+;;;
+;;; Each Codes entry maps a reifier to a named code set with a memo.
+;;; Mechanisms look up Codes at runtime rather than hardcoding strings.
+;;;
+
+(grimoire SIL-Codes
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Task Types
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify classification)           :CodeSet TaskType  :Memo "Supervised categorical prediction")
+  (new Codes :M (lexify regression)               :CodeSet TaskType  :Memo "Supervised continuous prediction")
+  (new Codes :M (lexify optimization)             :CodeSet TaskType  :Memo "Search for optimal solution")
+  (new Codes :M (lexify generation)               :CodeSet TaskType  :Memo "Produce novel output")
+  (new Codes :M (lexify search)                   :CodeSet TaskType  :Memo "Information retrieval")
+  (new Codes :M (lexify combinatorial-optimization) :CodeSet TaskType :Memo "NP-hard combinatorial search")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Approach Categories
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify llm-zero-shot)            :CodeSet Approach  :Memo "LLM with no examples")
+  (new Codes :M (lexify llm-few-shot)             :CodeSet Approach  :Memo "LLM with few-shot examples")
+  (new Codes :M (lexify classical-ml)             :CodeSet Approach  :Memo "Traditional ML (sklearn etc.)")
+  (new Codes :M (lexify algorithmic)              :CodeSet Approach  :Memo "Deterministic algorithm (BFS, DP, etc.)")
+  (new Codes :M (lexify ensemble)                 :CodeSet Approach  :Memo "Combined multiple approaches")
+  (new Codes :M (lexify fine-tuning)              :CodeSet Approach  :Memo "Fine-tuned language model")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Failure Modes
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify crash)                    :CodeSet FailureMode :Memo "Process exited with non-zero code")
+  (new Codes :M (lexify timeout)                  :CodeSet FailureMode :Memo "Execution exceeded time limit")
+  (new Codes :M (lexify rate-limit)               :CodeSet FailureMode :Memo "API rate limit exceeded")
+  (new Codes :M (lexify parse-error)              :CodeSet FailureMode :Memo "Output could not be parsed")
+  (new Codes :M (lexify missing-dep)              :CodeSet FailureMode :Memo "Required package not installed")
+  (new Codes :M (lexify out-of-vocabulary)        :CodeSet FailureMode :Memo "Prediction outside valid label set")
+  (new Codes :M (lexify wrong-format)             :CodeSet FailureMode :Memo "Output format does not match spec")
+  (new Codes :M (lexify incomplete-submission)    :CodeSet FailureMode :Memo "Not all test IDs present in output")
+  (new Codes :M (lexify memory-exhausted)         :CodeSet FailureMode :Memo "Process ran out of memory")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Metric Types
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify accuracy)                 :CodeSet MetricType :Memo "Fraction of correct predictions")
+  (new Codes :M (lexify f1)                       :CodeSet MetricType :Memo "Harmonic mean of precision and recall")
+  (new Codes :M (lexify rmse)                     :CodeSet MetricType :Memo "Root mean squared error")
+  (new Codes :M (lexify exact-match)              :CodeSet MetricType :Memo "Binary correct/incorrect per item")
+  (new Codes :M (lexify bleu)                     :CodeSet MetricType :Memo "BLEU score for translation quality")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Data Formats
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify csv)                      :CodeSet DataFormat :Memo "Comma-separated values")
+  (new Codes :M (lexify json)                     :CodeSet DataFormat :Memo "JSON structured data")
+  (new Codes :M (lexify parquet)                  :CodeSet DataFormat :Memo "Apache Parquet columnar format")
+  (new Codes :M (lexify text)                     :CodeSet DataFormat :Memo "Plain text file")
+  (new Codes :M (lexify image)                    :CodeSet DataFormat :Memo "Image file (PNG, JPEG, etc.)")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; Execution Statuses  (mirrors Execution enumeration)
+  ; ─────────────────────────────────────────────────────────────
+
+  (new Codes :M (lexify Idle)                     :CodeSet ExecStatus :Memo "Ready for work")
+  (new Codes :M (lexify Sent)                     :CodeSet ExecStatus :Memo "Message sent, awaiting reply")
+  (new Codes :M (lexify Wait)                     :CodeSet ExecStatus :Memo "In process but blocked")
+  (new Codes :M (lexify Late)                     :CodeSet ExecStatus :Memo "Timed out")
+  (new Codes :M (lexify Fail)                     :CodeSet ExecStatus :Memo "Incomplete")
+  (new Codes :M (lexify Warn)                     :CodeSet ExecStatus :Memo "Completed with warnings")
+  (new Codes :M (lexify Done)                     :CodeSet ExecStatus :Memo "Completed successfully")
+
+
+) ; end grimoire SIL-Codes

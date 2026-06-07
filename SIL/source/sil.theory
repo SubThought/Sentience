@@ -1,0 +1,119 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;; *************************************************************************************
+;;;
+;;; sil.theory version 001 — Self-Improving Learner
+;;;
+;;; Top-level entry point for the SIL system.
+;;; Same architecture as GIL: four concurrent components sharing
+;;; a Totality knowledge base.
+;;;
+;;; SIL = GIL with a different body.
+;;; GIL's body: a humanoid robot perceiving the physical world.
+;;; SIL's body: a Python runtime perceiving evaluation results.
+;;;
+;;;   ┌──────────────────────────────────────────────────────────┐
+;;;   │  Observation   Coordination   Reflection   Consolidation │
+;;;   │                                                          │
+;;;   │  (observe)     (coordinate)   (reflect)    (consolidate) │
+;;;   │       │              │             │              │      │
+;;;   │       │    ┌─────────────────────────────────────┐│      │
+;;;   │       └────│           SIL Totality              │┘      │
+;;;   │            │  Perceptual  · Associative          │       │
+;;;   │            │  Imaginative · Ontological          │       │
+;;;   │            │  Activative  · Control              │       │
+;;;   │            └─────────────────────────────────────┘       │
+;;;   └──────────────────────────────────────────────────────────┘
+;;;                          ▲        │
+;;;                     Perceiver  Executor
+;;;                          │        ▼
+;;;   ┌──────────────────────────────────────────────────────────┐
+;;;   │                   Psyche (Python)                        │
+;;;   │      File System · Shell · LLM APIs · Evaluation         │
+;;;   │                 Computational Workbench                  │
+;;;   └──────────────────────────────────────────────────────────┘
+;;;
+
+
+(module SIL
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §1  IMPORTS
+  ; ─────────────────────────────────────────────────────────────
+
+  (require SIL-Totality)
+  (require Operations from "file://operations.theory")
+  (require SIL-Observation)
+  (require SIL-Coordination)
+  (require SIL-Reflection)
+  (require SIL-Consolidation)
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §2  TOTALITY KNOWLEDGE BASE
+  ; ─────────────────────────────────────────────────────────────
+
+  (use (knowledge url "https://localhost/SIL/Totality")
+
+
+    ; ─────────────────────────────────────────────────────────────
+    ; §3  LOAD BOOTSTRAP DATA
+    ;
+    ; Load code sets, actuation definitions, and provider profiles
+    ; from grimoire files.
+    ; ─────────────────────────────────────────────────────────────
+
+    (grok "data/sil-codes.grimoire")
+    (grok "data/sil-actuations.grimoire")
+    (grok "data/sil-profiles.grimoire")
+
+
+    ; ─────────────────────────────────────────────────────────────
+    ; §4  WISDOM DOMAIN
+    ; ─────────────────────────────────────────────────────────────
+
+    (domain Wisdom
+
+      ; ─────────────────────────────────────────────────────────
+      ; §5  SELF-IMPROVEMENT PROBLEM
+      ;
+      ; SIL's initial state: a single Novelty fact asserting
+      ; that the system exists and improves.
+      ; All other knowledge — tasks, strategies, lessons, maxims —
+      ; is acquired through embodied experience with the
+      ; computational workbench.
+      ; ─────────────────────────────────────────────────────────
+
+      (problem Self-Improvement
+        state (assume Novelty :Facts [I_IMPROVE])))
+
+
+    ; ─────────────────────────────────────────────────────────────
+    ; §6  CONCURRENT LAUNCH
+    ;
+    ; All four cognitive components run concurrently.
+    ; The system has no generation loop.
+    ; It stops when homeostatic equilibrium is reached
+    ; (Accuracy need satisfied) or Time-Budget exhausted.
+    ; ─────────────────────────────────────────────────────────────
+
+    (concurrent
+      (observe)
+      (coordinate)
+      (reflect)
+      (consolidate))
+
+
+    ; ─────────────────────────────────────────────────────────────
+    ; §7  INFERENCE ENGINE
+    ; ─────────────────────────────────────────────────────────────
+
+    (think))
+
+
+) ; end module SIL
+
+;;; end theory SIL
