@@ -1,0 +1,93 @@
+;;; *************************************************************************************
+;;;  associative.memory — §5 ASSOCIATIVE MEMORY
+;;;
+;;;  Cases and the inverted Trait index.
+;;;
+;;;  Identity is GRADED.  matcher-find narrows to candidates through the
+;;;  index, then scores with the built-in similarity intrinsic and returns
+;;;  [MATCH :Score] so the CALLER chooses its own bar: Event identity demands
+;;;  1.0, percept assimilation does not.  u-GIL 1.0 had one global threshold,
+;;;  and it silently collapsed distinct board positions into one Case.
+;;; *************************************************************************************
+
+(extend Totality
+
+  (relation Case
+    :Case              ; unique case identifier
+    :R                 ; relation type of the stored content
+    :Content  0        ; reifier of the stored content scheme
+    :Traits   {}       ; the trait set
+    :Count    1        ; recurrence count
+    :Moment   0
+  )
+
+  ;; Trait — the inverted index.  One row per (trait, case), so a
+  ;; probe narrows to candidates sharing at least one trait
+  ;; instead of scanning every Case.
+  (relation Trait
+    :Trait             ; feature reifier
+    :R                 ; mirrors the parent Case's :R
+    :Case              ; the Case this trait belongs to
+  )
+
+
+  ;; ── matcher-find ──────────────────────────────────────────
+  ;;
+  ;; Phase 1 — candidates via the inverted index.
+  ;; Phase 2 — score with the built-in find; default comparer is
+  ;;           ~ (similarity).
+  ;; Phase 3 — package as MATCH tuples.
+
+  (function matcher-find {% list ?traits literal ?relation
+                            + ?minscore  := \%ninfinity
+                              ?maxscore  := 1
+                              ?limit     := 1
+                              ?return    := Content
+                              ?comparer  := nil}
+
+    (var ?candidates
+      (distinct
+        (with [Trait :R = ?relation :Trait as ?t :Case as ?c]
+              (contains ?traits ?t)
+          list ?c)))
+
+    (when (void-p ?candidates) (return {}))
+
+    (var ?scored
+      (on (null-p ?comparer)
+          (find ?traits ?candidates
+            limit ?limit  minscore ?minscore  maxscore ?maxscore
+            transform (given {?id}
+                        (with [Case :Case = ?id :Traits as ?ct] give ?ct)))
+          (find ?traits ?candidates
+            limit ?limit  minscore ?minscore  maxscore ?maxscore
+            comparer ?comparer
+            transform (given {?id}
+                        (with [Case :Case = ?id :Traits as ?ct] give ?ct)))))
+
+    (collect ?pair in ?scored
+      (bind ?pair 1 ?id 2 ?score)
+      (on (= ?return Case)
+          [MATCH :Case ?id :Score ?score]
+          (with [Case :Case = ?id :Content as ?content]
+            give [MATCH :Content ?content :Score ?score]))))
+
+
+  ;; store — commit a new experience to associative memory and
+  ;; index every one of its traits.
+  (function store {long ?content literal ?relation list ?traits}
+    (var ?case (reifier))
+    (new Case :Case ?case :R (R ?relation) :Content ?content
+              :Traits ?traits :Count 1 :Moment (moment))
+    (for ?t in ?traits
+      (knew Trait :Trait ?t :R (R ?relation) :Case ?case))
+    ?case)
+
+  ;; reinforce — a known experience recurred.
+  (function reinforce {long ?case}
+    (with [Case ^ as ?c :Case = ?case :Count as ?n]
+      do (put ?c :Count (+ ?n 1) :Moment (moment))))
+
+) ;; end extend Totality
+
+;;; ---------------  end of file -----------------

@@ -1,0 +1,89 @@
+;;; *************************************************************************************
+;;;  imaginative.memory — §6 IMAGINATIVE MEMORY
+;;;
+;;;  Canvas, Taxis, Vantage, Animation, Route.
+;;;
+;;;  A dream is a Taxis enabled in Imagined reality.  Because it is a scheme
+;;;  like any other, the Critic can simply ask (happening-p {?telon} ...
+;;;  Imagined) — rehearsal becomes a query, not a hand-built diff.
+;;;
+;;;  A Route is the imaginative representation of a journey: waypoints across
+;;;  Venues, with a cursor.  The Navigator mints one from the mind's own
+;;;  observed edges.  That is what replaces imported waypoint files.
+;;; *************************************************************************************
+
+(extend Totality
+
+  ;; Canvas — the stage, with its inventory.
+  (template Canvas
+    { :Figments   {}      ; the company
+      :Taxeis     {}      ; the sets
+      :Shots      {} }    ; the archive
+    { :Venue      nil })  ; which Venue this canvas depicts
+
+  ;; Taxis — THE ARRANGEMENT.  Viewpoint-invariant: a room seen
+  ;; from the door and from the window is ONE Taxis, twice
+  ;; witnessed.  The spatial mirror of Event.
+  (template Taxis
+    { :Items    {}        ; the Figments on stage
+      :Method   nil       ; Show | Hide | Move | Rotate | Scale
+      :Canvas   nil
+      :Venue    nil
+      :Scene    nil       ; perceptual backlink
+      :Affects  {} }
+    { :Telon    nil })    ; what this display serves
+
+  ;; Vantage — ONE SHOT.  Which Taxis was viewed, when, from where.
+  (template Vantage
+    { :Taxis    nil
+      :When     0
+      :EyeX     0.0  :EyeY  0.0  :EyeZ  5.0
+      :TargetX  0.0  :TargetY 0.0 :TargetZ 0.0
+      :FOV      60.0 })
+
+  ;; Figment — an imagined stand-in for a real Object.
+  (template Figment
+    { :Meshes   {}
+      :Clouds   {}
+      :Source   nil })    ; the Object it stands for — provenance
+
+  ;; Animation — a temporal sequence of shots within one Canvas.
+  (template Animation
+    { :Shots    {}
+      :Source   nil       ; Percept -> vidolon | Action -> simulation
+      :Start    0
+      :Current  0
+      :Until    0
+      :Loop     (R Once) })
+
+  ;; ── Route — spatial traversal ACROSS Canvases ─────────────
+  ;;
+  ;; Parallel to Animation.  Animation sequences Taxis within one
+  ;; Venue (temporal life in a place); Route sequences them across
+  ;; Venues (a journey between places).
+  ;;
+  ;;   Canvas    = Venue     (bounded space)
+  ;;   Taxis     = Scene     (arrangement within it)
+  ;;   Animation = experience (time within a place)
+  ;;   Route     = journey   (space across places)
+  ;;
+  ;; :Level is the abstraction the Route was planned at.  This is
+  ;; the horizon fix: forty steps at Place granularity is beyond
+  ;; any bounded walk; three hops at Locale granularity is not.
+  (template Route
+    { :Waypoints    {}     ; ordered Taxis or level monads
+      :Level        nil    ; Place | Locale | Area | Region
+      :Current      0      ; cursor
+      :Tries        0      ; per-leg patience
+      :Loop         (R Once) }
+    { :Destination  nil })
+
+  ;; route-for — the Route to a destination, or nil.
+  (function route-for {long ?destination}
+    (with [Scheme :M as ?rt :R = (R Route) :E as ?refs]
+          (in ?destination ?refs)
+      give ?rt else nil))
+
+) ;; end extend Totality
+
+;;; ---------------  end of file -----------------

@@ -1,0 +1,167 @@
+;;; *************************************************************************************
+;;;  activative.memory — §3 ACTIVATIVE MEMORY
+;;;
+;;;  What is currently relevant — and, in u-GIL 2.0, what is currently
+;;;  DECIDED.  Selection is activation strength in Desired reality:
+;;;
+;;;    * each proposing agent enables its candidate act in Desired
+;;;    * convergent proposals accumulate Pulses on the SAME monad
+;;;    * the Deliberator selects the most activated
+;;;    * Cronos decays what nobody re-endorses
+;;;
+;;;  Evidence is therefore additive, intent persists across ticks, and the
+;;;  windows supply the temporal dimension that a ranking procedure has no
+;;;  place for.
+;;; *************************************************************************************
+
+(extend Totality
+
+  ;; ── realities ─────────────────────────────────────────────
+  ;;
+  ;; u-GIL uses four.  The Expected/Observed pair is the whole
+  ;; prediction mechanism: Anticipator spreads downward in
+  ;; Expected, Observer upward in Observed, and their
+  ;; disagreement at a scheme IS the surprise.
+
+  (enumeration Realities
+    Observed    ; the current empirical world model
+    Desired     ; what the mind is trying to bring about
+    Expected    ; the forward model — predictions
+    Imagined    ; rehearsal, before anything is committed
+    Recalled    ; recalled past experience
+    Attained    ; Observed and Desired
+    Confirmed   ; Observed and Expected
+    Possible    ; hypothetical, not activated
+  )
+
+  (relation Viewpoint  :Viewpoint )
+
+  (new Viewpoint :M (V Awareness))
+  (new Emotion   :M (V Awareness) :Valence 0 :Arousal 0 :Approach 0 :Power 0)
+
+
+  ;; ── Activation ────────────────────────────────────────────
+  ;; One row per (Viewpoint x Reifier x Reality).
+
+  (relation Activation
+    :Viewpoint       (V Awareness)
+    :M               0
+    :Reality         nil
+    :EnabledSince    0
+    :EnabledUntil    0
+    :ImpededSince    0
+    :ImpededUntil    0
+    :Pulses          0    ; +N activation count;  -N inhibition count
+    :Merge           nil
+    :ArgumentQuorum  0
+    :ReferentQuorum  0
+    :Activation      nil
+    :Antipode        nil
+  )
+
+  (function enable {% list ?reifiers moment ?moment
+                      + long ?viewpoint := nil literal ?reality := nil}
+    (critical { GLOBAL-ACTIVATION-MODIFICATION }
+      (let ?rl (default ?reality Observed)
+           ?vp (default ?viewpoint (V Awareness)))
+      (for ?reifier in ?reifiers
+        (var ?a (knew Activation :M ?reifier :Viewpoint ?vp :Reality ?rl))
+        (var ?p (get ?a :Pulses))
+        (on (< ?p 1)
+            (put ?a :Pulses 1 :EnabledSince ?moment :EnabledUntil ?moment)
+            (put ?a :Pulses (+ ?p 1) :EnabledUntil ?moment)))))
+
+  (function impede {% list ?reifiers moment ?moment
+                      + long ?viewpoint := nil literal ?reality := nil}
+    (critical { GLOBAL-ACTIVATION-MODIFICATION }
+      (let ?rl (default ?reality Observed)
+           ?vp (default ?viewpoint (V Awareness)))
+      (for ?reifier in ?reifiers
+        (var ?a (knew Activation :M ?reifier :Viewpoint ?vp :Reality ?rl))
+        (var ?p (get ?a :Pulses))
+        (on (> ?p -1)
+            (put ?a :Pulses -1 :ImpededSince ?moment :ImpededUntil ?moment)
+            (put ?a :Pulses (- ?p 1) :ImpededUntil ?moment)))))
+
+  ;; happening-p — are ALL of these active here and now?
+  (function happening-p {list    ?reifiers
+                         + long    ?viewpoint := (V Awareness)
+                           literal ?reality   := Observed
+                           moment  ?moment    := (moment)}
+    (every ?reifier in ?reifiers
+      (with [Activation
+             :Viewpoint    = ?viewpoint
+             :Reality      = ?reality
+             :M            = ?reifier
+             :EnabledSince <= ?moment
+             :EnabledUntil >= ?moment
+             :Pulses       > 0]
+        deem yes else no)))
+
+
+  ;; ── Agenda — the blackboard ───────────────────────────────
+  ;;
+  ;; REUSED FROM GIL VERBATIM.  Agents never message each other;
+  ;; they read and write this.  The existing helpers settle the
+  ;; contract: score {?agendum} reads :Telon :Priority :Urgency,
+  ;; and likelihood {?telon ?act} takes telon and act SEPARATELY.
+  ;; So the Agenda holds telons; the Attempt holds acts.
+
+  (relation Agenda
+    :Telon               ; objective to be achieved
+    :Priority   0        ; cognitive assessment
+    :Urgency    0        ; homeostatic drive — the Ameliorator syncs it
+    :Exec       idle     ; idle | wait
+    :Plan       todo     ; Planning enumeration
+    :For        (L Life)
+    :By                  ; deadline moment
+    :Since               ; created
+  )
+
+  ;; ── Attempt — what was tried, and how it went ─────────────
+
+  (relation Attempt
+    :Trial            ; the Trial monad that was selected
+    :Telon            ; the objective being pursued
+    :Act              ; the actuation
+    :Exec             ; idle | sent | done | fail
+    :When       0
+  )
+
+  ;; likelihood — competence x opportunity x momentum.
+  ;; Note the signature: telon and act are separate arguments.
+  (function likelihood {?telon ?act}
+    (with [Utility :M = ?act :Attempts as ?att :Successes as ?suc]
+          [Agenda :Telon = ?telon :By as ?by :Since as ?since]
+      do
+      (var ?now (moment))
+      (var ?competence (/ ?suc (max ?att 1)))
+      (var ?opportunity
+        (if (= ?by infinity) 1
+            (clamp (/ (- ?by ?now) (max (- ?by ?since) 1)) 0 1)))
+      (var ?failures (tally [Attempt :Telon = ?telon :Exec = fail]))
+      (var ?momentum (/ 1 (+ 1 ?failures)))
+      (* ?competence (* ?opportunity ?momentum))))
+
+  ;; score — priority with an emergency override.
+  (function score {?agendum}
+    (var ?emergency (setting Registry Coping :EmergencyThreshold))
+    (bind ?agendum :Priority ?priority :Urgency ?urgency)
+    (if (> ?urgency ?emergency) ?urgency (+ ?priority ?urgency)))
+
+
+  ;; ── Glue — where a scheme sits in the Totality ────────────
+  ;; Radial propagation flows through this.
+
+  (relation Glue
+    :M      0
+    :X      0
+    :Y      0
+    :Z      0     ; tier, from tier-for
+    :Disp   0.1
+    :Temp   0
+  )
+
+) ;; end extend Totality
+
+;;; ---------------  end of file -----------------

@@ -1,0 +1,328 @@
+;;; *************************************************************************************
+;;;  ontological.memory — §2 ONTOLOGICAL MEMORY
+;;;
+;;;  The Scheme is the unit of representation.  A Scheme is a neural
+;;;  proposition: a Reifier, a Relation, Arguments (afferent inputs) and
+;;;  Referents (efferent outputs).
+;;;
+;;;  THE ONE EDIT THAT MATTERS, versus GIL: the Action template declares
+;;;  :Result as a REFERENT rather than an argument.  That single change makes
+;;;  activation flow the right way through an Action:
+;;;
+;;;    Observer   (upward, Observed)  context+goals active -> Action fires -> Result enabled
+;;;    Anticipator(downward,Expected) Action expected      -> Result expected
+;;;
+;;;  So an Action scheme IS the forward model.  No separate transition table,
+;;;  and surprise is the Expected-vs-Observed disagreement at the :Result
+;;;  monads.
+;;; *************************************************************************************
+
+(extend Totality
+
+  ;; ── belief, affect, need ──────────────────────────────────
+
+  (relation Belief
+    :Viewpoint  (V Awareness)
+    :M          0
+    :Reality    nil
+    :Certainty  0
+    :Moment     0
+  )
+
+  (relation Emotion
+    :M         0
+    :Valence   0    ; good / bad
+    :Arousal   0    ; urgent / calm
+    :Approach  0    ; toward / away
+    :Power     0    ; in control / helpless
+  )
+
+  (relation Need
+    :Name     nil   ; homeostatic variable symbol
+    :M        0
+    :Urgency  0     ; signed delta from the homeostatic target
+  )
+
+  (function urgency {?reifier}
+    (with [Need :M = ?reifier :Urgency as ?u] give ?u else 0))
+
+
+  ;; ── reifiers and dyads ────────────────────────────────────
+  ;;
+  ;; Every monad has an antithesis: its arithmetic negation.  That
+  ;; is what makes failure first-class — "the not-grasp occurred"
+  ;; is a queryable monad with its own activation history, and
+  ;; repeated failures share it.
+
+  (stash ?*REIFIERS* (R Autogenous) "Autogenous reifier counter")
+
+  (function reifiers {} returns long ?*REIFIERS*)
+
+  (function reifier {+ ?arg := 1} returns long
+    (critical { GLOBAL-TERM-CREATION }
+      (set ?*REIFIERS* (+ ?*REIFIERS* ?arg))
+      ?*REIFIERS*))
+
+  (function dyad   {long ?monad} (- ?monad))
+  (function thesis {long ?monad} (on (> ?monad 0)  ?monad    (- ?monad)))
+  (function antith {long ?monad} (on (> ?monad 0) (- ?monad)  ?monad))
+
+
+  ;; ── usage and utility ─────────────────────────────────────
+
+  (relation Usage
+    :M      0
+    :Count  1
+    :Made   nil
+    :Used   nil
+  )
+
+  (function touch {long ?monad + literal ?slot := :Used}
+    (with [Usage ^ as ?u :M = ?monad :Count as ?c]
+      do (put ?u :Count (+ ?c 1) ?slot (moment))
+      else (new Usage :M ?monad :Count 1 :Made (moment) :Used (moment))))
+
+  ;; Utility — the reliability ledger the Reactor reads.
+  (relation Utility
+    :M         0
+    :Attempts  0
+    :Successes 0
+    :Moment    0
+  )
+
+  (function reliability {long ?act}
+    (with [Utility :M = ?act :Attempts as ?att :Successes as ?suc]
+      give (if (> ?att 0) (/ ?suc ?att) 0) else 0))
+
+
+  ;; ── schemes ───────────────────────────────────────────────
+
+  (relation Argument
+    :A    ; reifier of the argument
+    :R    ; reifier of the relationship
+    :M    ; reifier of the scheme
+  )
+
+  (relation Referent
+    :E    ; reifier of the referent
+    :R
+    :M
+  )
+
+  (function relate {long ?reifier long ?relation list ?arguments list ?referents}
+    (critical { GLOBAL-TERM-CREATION }
+      (for ?a in ?arguments (knew Argument :M ?reifier :R ?relation :A ?a))
+      (for ?e in ?referents (knew Referent :M ?reifier :R ?relation :E ?e))))
+
+  (relation Scheme
+    :M          ; unique identity
+    :R          ; Relationships enumeration value
+    :A    {}    ; afferent reifiers  (inputs)
+    :E    {}    ; efferent reifiers  (outputs)
+    :L          ; label
+  )
+
+  ;; make — allocate a reifier, create the Scheme, return the reifier.
+  (function make {% ?relation := nil ?arguments := nil ?referents := nil}
+    returns long
+    (critical { GLOBAL-SCHEME-CREATION }
+      (let ?reifier      (reifier)
+           ?relationship (on (or (null-p ?relation) (taxon-p ?relation number))
+                             ?relation
+                             (lexify ?relation))
+           ?arglist      (map ?arguments lexify)
+           ?reflist      (map ?referents lexify))
+      (relate ?reifier ?relationship ?arguments ?referents)
+      (new Scheme :M ?reifier :R ?relationship :A ?arglist :E ?reflist)
+      ?reifier))
+
+
+  ;; ── templates and the Wire ────────────────────────────────
+  ;;
+  ;; template declares the flat table AND a Wire naming which
+  ;; slots are afferent and which efferent.  schema then mints a
+  ;; row AND a Scheme whose :A/:E are those slots' contents, so
+  ;; activation flows through the slots for free.
+
+  (relation Wire
+    :Relation
+    :A  {}    ; afferent slot names
+    :E  {}    ; efferent slot names
+  )
+
+  (function template {atom ?schema list ?arguments + list ?referents := nil}
+    (critical { GLOBAL-SCHEMA-CONSTRUCTION }
+      (apply relation ?schema :M ?arguments ?referents)
+      (var ?a-slots (filter ?k ?v in ?arguments (taxon-p ?v list)))
+      (var ?e-slots (on (null-p ?referents) {}
+                        (filter ?k ?v in ?referents (taxon-p ?v list))))
+      (when (or (not (void-p ?a-slots)) (not (void-p ?e-slots)))
+        (new Wire :Relation ?schema
+                  :A (for ?k ?v in ?a-slots give ?k)
+                  :E (for ?k ?v in ?e-slots give ?k)))))
+
+  (function schema {atom ?relation + ?slots}
+    (critical { GLOBAL-SCHEMA-CONSTRUCTION }
+      (var ?monad (reifier))
+      (apply knew ?relation :M ?monad ?slots)
+      (with [Wire :Relation = ?relation :A as ?a-slots :E as ?e-slots]
+        do
+        (var ?a-monads
+          (flatten (for ?s in ?a-slots
+                     (var ?val (@ ?slots ?s))
+                     (when (taxon-p ?val list) give ?val))))
+        (var ?e-monads
+          (flatten (for ?s in ?e-slots
+                     (var ?val (@ ?slots ?s))
+                     (when (taxon-p ?val list) give ?val))))
+        (new Scheme :M ?monad :R (R ?relation) :A ?a-monads :E ?e-monads))
+      (touch ?monad :Made)
+      ?monad))
+
+
+  ;; ═══════════════════════════════════════════════════════════
+  ;; THE TEMPLATES
+  ;; ═══════════════════════════════════════════════════════════
+
+  ;; ── Actuation — level 0 of the action ladder ──────────────
+  ;; One per act the device offers.  Minted from the frame's
+  ;; :AvailableActions; the mind is not told what any of them do.
+
+  (template Actuation
+    { :Name      nil
+      :Device    nil
+      :Modality  nil })
+
+  ;; Capability — is this actuation on offer right now?
+  ;; Reading it is how the mind learns that some acts need
+  ;; parameters or are unavailable, instead of being told.
+  (template Capability
+    { :Action   nil
+      :Enabled  yes
+      :Moment   0 })
+
+
+  ;; ── Action — THE unit of possible behaviour ───────────────
+  ;;
+  ;; Arguments: :Context (Unison of preconditions), :Goals (Series
+  ;; of actuations or sub-actions), plus scalars.
+  ;; Referents: :Result (Unison of postconditions).
+  ;;
+  ;; An EMPTY :Result is the frontier — the Explorer fires on it.
+  ;; A composite bred by the Automator is a multi-step plan
+  ;; selectable in a single decision.
+
+  (template Action
+    { :Context  {}        ; arguments  — Unison of precondition reifiers
+      :Goals    {}        ;            — Series of actuations or sub-actions
+      :Loop     (R Once)
+      :For      (L Life) }
+    { :Result   {} })     ; referents  — Unison of postcondition reifiers
+
+  ;; ── Objective ─────────────────────────────────────────────
+
+  (enumeration Drives  life  play )
+
+  (template Objective
+    { :Drive    life
+      :Need     nil
+      :Urgency  0
+      :Context  {}
+      :Goals    {} }
+    { :Result   {} })
+
+  ;; ── Trial — a proposal awaiting selection ─────────────────
+  ;; A proposer mints a Trial and enables it in Desired.  Pulses
+  ;; accumulate when several proposers converge on the same act.
+
+  (template Trial
+    { :Action  nil
+      :Basis   nil     ; which agent proposed it — provenance
+      :Dream   nil     ; the Taxis rehearsed, if any
+      :Doing   idle
+      :Moment  0 })
+
+  ;; ── Event — what occurred, either pole ────────────────────
+  ;; On success :What is the Action; on failure it is the dyad.
+
+  (template Event
+    { :Who    {}
+      :What   nil      ; the Action monad, or its antithesis
+      :Where  nil      ; the Venue the body was in
+      :When   nil      ; narrative qualifier, ascribed later
+      :Why    nil      ; the telon
+      :How    nil      ; the actuation
+      :With   {}
+      :Whom   {}
+      :View   (V Awareness) })
+
+  ;; ── Problem — a posed gap ─────────────────────────────────
+
+  (template Problem
+    { :Context  {}
+      :Desired  {}
+      :Status   open
+      :Domain   nil })
+
+  ;; ── Hypotheses — two-sided confidence ─────────────────────
+  ;; :Forward is predictive evidence, :Backward retrodictive.
+  ;; :Confidence is their mean.  A single fluke cannot overturn a
+  ;; repeatedly confirmed belief.
+
+  (template Causes
+    { :Premise     {}
+      :Surmise     {}
+      :Support     open    ; open | confirmed | disconfirmed
+      :Confidence  0
+      :Forward     0
+      :Backward    0 })
+
+  (template Implies
+    { :Premise     {}
+      :Surmise     {}
+      :Support     open
+      :Confidence  0
+      :Forward     0
+      :Backward    0 })
+
+  (template Prediction
+    { :Hypothesis  nil
+      :Deadline    0
+      :Outcome     pending   ; pending | succeeded | failed
+      :Moment      0 })
+
+  (template Experiment
+    { :Hypothesis  nil
+      :Setup       {}
+      :Test        nil
+      :Expected    {}
+      :Actual      {}
+      :Verdict     nil
+      :Doing       idle })
+
+  ;; ── Observable, Origin, Lesson ────────────────────────────
+
+  (template Observable
+    { :Modality  nil
+      :Channel   nil
+      :Data      nil
+      :Address   nil
+      :Moment    0 })
+
+  (enumeration Provenances  Made  Copied  Edited  Swapped  Freed )
+
+  (template Origin
+    { :M           nil
+      :Provenance  nil
+      :Mechanism   nil    ; which agent did it
+      :Source      nil
+      :Moment      nil })
+
+  (template Lesson
+    { :Problem  nil
+      :Maxim    nil
+      :Moment   0 })
+
+) ;; end extend Totality
+
+;;; ---------------  end of file -----------------
