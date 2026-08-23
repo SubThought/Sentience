@@ -1,0 +1,188 @@
+;;; *************************************************************************************
+;;;  coordination.patterns — Coordination component manifest.
+;;;
+;;;  Activation, association, spatial construction, navigation, and the
+;;;  decision itself.  Selection is activation strength in Desired reality:
+;;;  proposers enable a candidate act, gates impede, the Deliberator picks
+;;;  the most activated, Cronos decays what nobody re-endorses.
+;;; *************************************************************************************
+
+(theory Coordination {2 0 0}
+
+  "Coordination — activation, association, space, navigation, decision."
+
+  (require  Coordination  from  "../pattern/activating.pattern"    or abort)
+  (require  Coordination  from  "../pattern/associating.pattern"   or abort)
+  (require  Coordination  from  "../pattern/locating.pattern"      or abort)
+  (require  Coordination  from  "../pattern/navigating.pattern"    or abort)
+  (require  Coordination  from  "../pattern/imagining.pattern"     or abort)
+  (require  Coordination  from  "../pattern/reacting.pattern"      or abort)
+  (require  Coordination  from  "../pattern/deliberating.pattern"  or abort)
+
+
+  ;; ── shared support ────────────────────────────────────────
+
+  ;; is-active — does this reifier have positive Pulses here?
+  (function is-active {long ?reifier literal ?reality}
+    (var ?result no)
+    (with [Activation :M = ?reifier :Reality = ?reality :Pulses as ?p]
+          (> ?p 0)
+      do (set ?result yes))
+    ?result)
+
+  ;; pulses-of — the activation strength of a reifier in a reality.
+  ;; This is the quantity the Deliberator selects on.
+  (function pulses-of {long ?reifier literal ?reality}
+    (var ?n 0)
+    (with [Activation :M = ?reifier :Reality = ?reality :Pulses as ?p]
+      do (set ?n ?p))
+    ?n)
+
+  ;; count-active — how many of these reifiers are active?
+  (function count-active {list ?reifiers literal ?reality}
+    (var ?count 0)
+    (for ?r in ?reifiers
+      (when (is-active ?r ?reality) (set ?count (+ ?count 1))))
+    ?count)
+
+  ;; seq-ordered — all active AND enabled in sequence.
+  (function seq-ordered {list ?reifiers literal ?reality}
+    (when (< (# ?reifiers) 2) (return yes))
+    (when (/= (count-active ?reifiers ?reality) (# ?reifiers)) (return no))
+    (var ?ordered yes)
+    (for ?i in (range 1 to (- (# ?reifiers) 1) by 1)
+      (var ?prev (@ ?reifiers ?i))
+      (var ?next (@ ?reifiers (+ ?i 1)))
+      (var ?tp 0) (var ?tn 0)
+      (with [Activation :M = ?prev :Reality = ?reality :EnabledSince as ?t] do (set ?tp ?t))
+      (with [Activation :M = ?next :Reality = ?reality :EnabledSince as ?t] do (set ?tn ?t))
+      (when (>= ?tp ?tn) (set ?ordered no)))
+    ?ordered)
+
+  ;; coalesce — evaluate a scheme's merge rule against its active
+  ;; arguments.  If the quorum is met, enable the scheme and
+  ;; disperse activation to its referents.
+  ;;
+  ;; This is what makes an Action scheme a forward model: when
+  ;; :Context and :Goals are active the Action fires, and its
+  ;; :Result — declared as a REFERENT — is enabled downstream.
+  (function coalesce {long ?scheme literal ?reality moment ?now}
+    (with [Scheme :M = ?scheme :R as ?rel :A as ?args :E as ?refs]
+      do
+      (var ?merge PASS)
+      (with [Merging :R = ?rel :Merge as ?m] do (set ?merge ?m))
+      (var ?total  (# ?args))
+      (var ?active (count-active ?args ?reality))
+      (var ?fires
+        (case ?merge
+          of ONE   (= ?active 1)
+          of PASS  (> ?active 0)
+          of NOT   (= ?active 0)
+          of AND   (= ?active ?total)
+          of SEQ   (seq-ordered ?args ?reality)
+          of OR    (> ?active 0)
+          of NOR   (= ?active 0)
+          of VOTE  (> (* 2 ?active) ?total)
+          else     (> ?active 0)))
+      (when ?fires
+        (enable :reifiers {?scheme} :moment ?now :reality ?reality)
+        (when (> (# ?refs) 0)
+          (enable :reifiers ?refs :moment ?now :reality ?reality)))))
+
+  ;; propagate-upward — argument -> reifier -> referent.
+  ;; The Observer (Observed) and Dreamer (Imagined) call this.
+  (function propagate-upward {long ?reifier moment ?now literal ?reality}
+    (with [Argument :A = ?reifier :M as ?parent]
+      do (coalesce ?parent ?reality ?now)))
+
+  ;; propagate-downward — referent -> reifier -> argument.
+  ;; The Anticipator (Expected) calls this.  Running it in
+  ;; Expected is what makes prediction structural: an Action
+  ;; enabled in Expected enables its :Result in Expected, and the
+  ;; disagreement with Observed IS the surprise.
+  (function propagate-downward {long ?reifier moment ?now literal ?reality}
+    (with [Referent :E = ?reifier :M as ?parent]
+      do
+      (enable :reifiers {?parent} :moment ?now :reality ?reality)
+      (with [Scheme :M = ?parent :A as ?args]
+        do (when (> (# ?args) 0)
+             (enable :reifiers ?args :moment ?now :reality ?reality)))))
+
+  ;; propagate-radial — spread by Glue proximity, attenuated by
+  ;; distance.  The Reminder (Recalled) calls this.
+  (function propagate-radial {long ?reifier moment ?now literal ?reality
+                              + real ?radius := 5.0}
+    (with [Glue :M = ?reifier :X as ?x :Y as ?y :Z as ?z]
+      do
+      (with [Glue :M as ?neighbor :X as ?nx :Y as ?ny :Z as ?nz]
+            (/= ?neighbor ?reifier)
+        do
+        (var ?dist (sqrt (+ (* (- ?nx ?x) (- ?nx ?x))
+                            (* (- ?ny ?y) (- ?ny ?y))
+                            (* (- ?nz ?z) (- ?nz ?z)))))
+        (when (and (< ?dist ?radius) (> ?dist 0))
+          (enable :reifiers {?neighbor} :moment ?now :reality ?reality)))))
+
+  ;; co-active — schemes of a given relation active within a window.
+  (function co-active {moment ?window long ?relation}
+    (var ?cutoff (- (moment) ?window))
+    (with [Activation :M as ?r :EnabledUntil as ?eu]
+          (> ?eu ?cutoff)
+          [Scheme :M = ?r :R = ?relation]
+      list ?r))
+
+  ;; active-schemes — currently active schemes of a relation.
+  (function active-schemes {literal ?relation}
+    (with [Activation :M as ?r :Pulses as ?p :Reality = Observed]
+          (> ?p 0)
+          [Scheme :M = ?r :R = (R ?relation)]
+      list ?r))
+
+  ;; chunk-partition — split a list into Miller-law groups.
+  (function chunk-partition {list ?items + integer ?min := 5 integer ?max := 9}
+    (var ?n (# ?items))
+    (if (<= ?n ?max)
+        {?items}
+     else
+        (var ?first-size (+ ?min (random 0 to (- ?max ?min))))
+        (if (< (- ?n ?first-size) ?min)
+            {?items}
+         else
+            (& {(top ?items ?first-size)}
+               (chunk-partition (rest ?items ?first-size) ?min ?max)))))
+
+  ;; shared-elements — intersection of two element lists.
+  (function shared-elements {list ?a list ?b}
+    (collect ?e in ?a (in ?b ?e) list ?e))
+
+
+  ;; ── launch ────────────────────────────────────────────────
+  ;;
+  ;; Substrate first (activation must be flowing before anything
+  ;; proposes), then association and space, then the decision.
+
+  (function coordinate {}
+    "Start all coordination mechanisms."
+    (trace "[Coordination] starting")
+    (map {
+           ;; substrate
+           Activator  Cronos
+           Observer   Anticipator  Reminder  Dreamer
+           ;; association and abstraction
+           Assembler  Tandemer     Unisoner
+           ;; space — the seven levels
+           Locater    Mapper
+           ;; navigation
+           Navigator
+           ;; imagination
+           Imaginer
+           ;; the decision
+           Deliberator
+         }
+         (given {?m} (call start ?m)))
+    (trace "[Coordination] running")
+    coordinating)
+
+) ;; end theory Coordination
+
+;;; ---------------  end of file -----------------

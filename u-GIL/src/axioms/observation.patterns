@@ -1,0 +1,28 @@
+;;; *************************************************************************************
+;;;  observation.patterns — Observation component manifest.
+;;;
+;;;  Perception, embodiment, and reminding.  Detection is the ONLY
+;;;  modality-specific stage; everything downstream works on the trait set
+;;;  alone and cannot tell a grid from a knee.
+;;; *************************************************************************************
+
+(theory Observation {2 0 0}
+
+  "Observation — Mind/Body, Observing, Reminding."
+
+  (require  Observation  from  "../pattern/observing.pattern"  or abort)
+  (require  Observation  from  "../pattern/embodying.pattern"  or abort)
+  (require  Observation  from  "../pattern/reminding.pattern"  or abort)
+
+  ;; observe — start every observation mechanism.
+  (function observe {}
+    "Start all observation mechanisms."
+    (trace "[Observation] starting")
+    (map { Perceiver Detector Matcher Lexer Storer Scener Activator Executor }
+         (given {?m} (call start ?m)))
+    (trace "[Observation] running")
+    observing)
+
+) ;; end theory Observation
+
+;;; ---------------  end of file -----------------

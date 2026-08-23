@@ -1,0 +1,329 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; eidos.package — ARC-AGI-3 Protocol Functions
+;;;
+;;; Pure Premise — no DLL. Uses encode/decode json and tell/ask over
+;;; HTTPS to communicate with the ARC-AGI-3 REST API.
+;;;
+;;; ARC-AGI-3 environment:
+;;;   64×64 grid, 16 colors (0–15), 7 standardized actions
+;;;   Turn-based: grid changes only when the agent acts
+;;;   Scored by RHAE: (human_actions / ai_actions)²
+;;;
+;;; REST API endpoints (three.arcprize.org):
+;;;   POST /command   — execute action (RESET, ACTION1–7)
+;;;   POST /reset     — start or restart a game
+;;;   GET  /games     — list available games
+;;;   POST /scorecard/open   — open scorecard
+;;;   POST /scorecard/close  — close scorecard
+;;;   GET  /scorecard/:id    — get scorecard
+;;;
+;;; Grid representations:
+;;;   raw    — flat list of 4096 integers (64×64)
+;;;   sparse — list of {:I index :C color} for non-background cells
+;;;   rle    — run-length encoded {count color count color ...}
+;;;
+
+(theory  Eidos {1 0 0}
+  "Eidos — ARC-AGI-3 protocol. Pure Premise, encode/decode json, tell/ask over HTTPS."
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §1  CONFIGURATION
+  ;;; ══════════════════════════════════════════════════════════
+
+  (var ?eidos-grid-format raw)     ;;; raw | sparse | rle
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §2  CONNECTION
+  ;;;
+  ;;; Opens an HTTPS connection to the ARC-AGI-3 API.
+  ;;; The API key is passed as an option and used in headers.
+  ;;; ══════════════════════════════════════════════════════════
+
+  (function eidos-open {string ?url idiom ?options}
+    (var ?conn (open ?url ?options))
+    (when (nil-p ?conn)
+      (signal Failure :Text ($ "Eidos: could not connect to" ?url)))
+    ?conn)
+
+  (function eidos-close {?handle}
+    (close ?handle)
+    closed)
+
+  (function eidos-status {?handle}
+    (try
+      (var ?games (eidos-list-games ?handle))
+      {:Status connected :Adapter eidos :Games (# ?games)}
+    learn ?err
+      {:Status disconnected :Adapter eidos :Error (string ?err)}))
+
+  (function eidos-set-grid-format {literal ?format}
+    (set ?eidos-grid-format ?format))
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §3  API CALLS
+  ;;;
+  ;;; Each function encodes a Premise idiom to JSON, sends it
+  ;;; via tell/ask, decodes the JSON response back to Premise.
+  ;;; ══════════════════════════════════════════════════════════
+
+  ;;; (eidos-api-post handle path body) → decoded response
+  (function eidos-api-post {?handle string ?path idiom ?body}
+    (var ?json (encode ?body json))
+    (var ?response (tell ?handle {:path ?path :method POST :body ?json}))
+    (decode ?response json))
+
+  ;;; (eidos-api-get handle path) → decoded response
+  (function eidos-api-get {?handle string ?path}
+    (var ?response (ask ?handle {:path ?path :method GET}))
+    (decode ?response json))
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §4  GAME MANAGEMENT
+  ;;; ══════════════════════════════════════════════════════════
+
+  ;;; (eidos-list-games handle) → list of game info idioms
+  (function eidos-list-games {?handle}
+    (eidos-api-get ?handle "/api/v1/games"))
+
+  ;;; (eidos-reset handle gameId) → frame data idiom
+  ;;; Starts a new game session or resets the current one.
+  (function eidos-reset {?handle string ?gameId}
+    (var ?resp (eidos-api-post ?handle "/api/v1/command"
+                {:game_id ?gameId :action "RESET"}))
+    (eidos-wrap-frame ?resp))
+
+  ;;; (eidos-reset-level handle) → frame data idiom
+  ;;; Resets the current level without starting a new session.
+  (function eidos-reset-level {?handle}
+    (var ?resp (eidos-api-post ?handle "/api/v1/command"
+                {:action "RESET"}))
+    (eidos-wrap-frame ?resp))
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §5  ACTIONS
+  ;;;
+  ;;; 7 standardized actions:
+  ;;;   RESET    — restart game/level
+  ;;;   ACTION1  — simple (up)
+  ;;;   ACTION2  — simple (down)
+  ;;;   ACTION3  — simple (left)
+  ;;;   ACTION4  — simple (right)
+  ;;;   ACTION5  — simple (interact/select/rotate)
+  ;;;   ACTION6  — complex (requires x,y 0–63)
+  ;;;   ACTION7  — undo
+  ;;; ══════════════════════════════════════════════════════════
+
+  (function eidos-step {?handle literal ?action}
+    (var ?resp (eidos-api-post ?handle "/api/v1/command"
+                {:action (string ?action)}))
+    (eidos-wrap-frame ?resp))
+
+  (function eidos-step-xy {?handle integer ?x integer ?y}
+    (var ?resp (eidos-api-post ?handle "/api/v1/command"
+                {:action "ACTION6" :data {:x ?x :y ?y}}))
+    (eidos-wrap-frame ?resp))
+
+  ;;; Convenience: named actions
+  (function eidos-up {?handle}       (eidos-step ?handle ACTION1))
+  (function eidos-down {?handle}     (eidos-step ?handle ACTION2))
+  (function eidos-left {?handle}     (eidos-step ?handle ACTION3))
+  (function eidos-right {?handle}    (eidos-step ?handle ACTION4))
+  (function eidos-interact {?handle} (eidos-step ?handle ACTION5))
+  (function eidos-click {?handle integer ?x integer ?y} (eidos-step-xy ?handle ?x ?y))
+  (function eidos-undo {?handle}     (eidos-step ?handle ACTION7))
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §6  SCORECARDS
+  ;;; ══════════════════════════════════════════════════════════
+
+  (function eidos-scorecard-open {?handle idiom ?metadata}
+    (eidos-api-post ?handle "/api/v1/scorecard/open" ?metadata))
+
+  (function eidos-scorecard-close {?handle string ?cardId}
+    (eidos-api-post ?handle "/api/v1/scorecard/close" {:card_id ?cardId}))
+
+  (function eidos-scorecard-get {?handle string ?cardId}
+    (eidos-api-get ?handle ($ "/api/v1/scorecard/" ?cardId)))
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §7  FRAME PROCESSING
+  ;;;
+  ;;; Wraps the raw API response into a normalized idiom with
+  ;;; the grid in the configured format (raw, sparse, or rle).
+  ;;; ══════════════════════════════════════════════════════════
+
+  (function eidos-wrap-frame {idiom ?resp}
+    (var ?raw-grid (:grid ?resp))
+    (var ?grid
+      (case ?eidos-grid-format
+        of sparse  (grid-to-sparse ?raw-grid (# ?raw-grid))
+        of rle     (grid-to-rle ?raw-grid (# ?raw-grid))
+        else       ?raw-grid))
+    {:GameId          (:game_id ?resp)
+     :Level           (:level ?resp)
+     :Width           64
+     :Height          64
+     :Format          ?eidos-grid-format
+     :Grid            ?grid
+     :State           (:state ?resp)
+     :LevelsCompleted (:levels_completed ?resp)
+     :TotalLevels     (:total_levels ?resp)
+     :ActionsUsed     (:actions_used ?resp)
+     :HumanActions    (:human_actions ?resp)
+     :AvailableActions (:available_actions ?resp)})
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §8  GRID COMPRESSION
+  ;;; ══════════════════════════════════════════════════════════
+
+  ;;; (grid-to-sparse grid size) → list of {:I index :C color}
+  ;;; Only non-zero (non-background) cells.
+  (function grid-to-sparse {list ?grid integer ?size}
+    (var ?result {})
+    (var ?i 0)
+    (for ?cell in ?grid
+      (when (/= ?cell 0)
+        (append ?result {:I ?i :C ?cell}))
+      (set ?i (+ ?i 1)))
+    ?result)
+
+  ;;; (grid-to-rle grid size) → flat list {count color count color ...}
+  ;;; Run-length encoded.
+  (function grid-to-rle {list ?grid integer ?size}
+    (var ?result {})
+    (var ?run-color (@ ?grid 1))
+    (var ?run-count 1)
+    (var ?i 1)
+    (for ?cell in (rest ?grid)
+      (if (= ?cell ?run-color)
+        (set ?run-count (+ ?run-count 1))
+      else
+        (do
+          (append ?result ?run-count)
+          (append ?result ?run-color)
+          (set ?run-color ?cell)
+          (set ?run-count 1)))
+      (set ?i (+ ?i 1)))
+    ;;; Final run
+    (append ?result ?run-count)
+    (append ?result ?run-color)
+    ?result)
+
+  ;;; (sparse-to-grid sparse width height) → flat list of integers
+  ;;; Reconstructs full grid from sparse representation.
+  (function sparse-to-grid {list ?sparse integer ?width integer ?height}
+    (var ?size (* ?width ?height))
+    (var ?grid (repeat ?size 0))
+    (for ?entry in ?sparse
+      (put ?grid (:I ?entry) (:C ?entry)))
+    ?grid)
+
+  ;;; (rle-to-grid rle) → flat list of integers
+  ;;; Reconstructs full grid from run-length encoding.
+  (function rle-to-grid {list ?rle}
+    (var ?grid {})
+    (var ?i 0)
+    (for ?val in ?rle
+      (if (= (mod ?i 2) 0)
+        (set ?count ?val)
+      else
+        (for ?j in (range ?count)
+          (append ?grid ?val)))
+      (set ?i (+ ?i 1)))
+    ?grid)
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §9  GRID UTILITIES
+  ;;; ══════════════════════════════════════════════════════════
+
+  ;;; (grid-cell grid x y width) → color at (x, y)
+  (function grid-cell {list ?grid integer ?x integer ?y integer ?width}
+    (@ ?grid (+ (* ?y ?width) ?x 1)))
+
+  ;;; (grid-row grid y width) → list of colors in row y
+  (function grid-row {list ?grid integer ?y integer ?width}
+    (var ?start (+ (* ?y ?width) 1))
+    (var ?result {})
+    (for ?i in (range ?width)
+      (append ?result (@ ?grid (+ ?start ?i))))
+    ?result)
+
+  ;;; (grid-diff grid1 grid2 size) → list of {:I index :From old :To new}
+  (function grid-diff {list ?g1 list ?g2 integer ?size}
+    (var ?result {})
+    (for ?i in (range ?size)
+      (var ?a (@ ?g1 (+ ?i 1)))
+      (var ?b (@ ?g2 (+ ?i 1)))
+      (when (/= ?a ?b)
+        (append ?result {:I ?i :From ?a :To ?b})))
+    ?result)
+
+  ;;; (grid-colors grid) → sorted list of unique non-zero colors
+  (function grid-colors {list ?grid}
+    (var ?seen {})
+    (for ?cell in ?grid
+      (when (and (/= ?cell 0) (not (contains ?seen ?cell)))
+        (append ?seen ?cell)))
+    (sort ?seen))
+
+  ;;; (grid-count grid color) → number of cells with this color
+  (function grid-count {list ?grid integer ?color}
+    (var ?n 0)
+    (for ?cell in ?grid
+      (when (= ?cell ?color)
+        (set ?n (+ ?n 1))))
+    ?n)
+
+
+  ;;; ══════════════════════════════════════════════════════════
+  ;;; §10  DISPATCH
+  ;;; ══════════════════════════════════════════════════════════
+
+  (function eidos-dispatch {?handle literal ?action idiom ?params}
+    (case ?action
+      of reset      (if (nil-p (:GameId ?params))
+                      (eidos-reset-level ?handle)
+                    else
+                      (eidos-reset ?handle (:GameId ?params)))
+      of action1    (eidos-up ?handle)
+      of action2    (eidos-down ?handle)
+      of action3    (eidos-left ?handle)
+      of action4    (eidos-right ?handle)
+      of action5    (eidos-interact ?handle)
+      of action6    (eidos-click ?handle (:X ?params) (:Y ?params))
+      of action7    (eidos-undo ?handle)
+      of up         (eidos-up ?handle)
+      of down       (eidos-down ?handle)
+      of left       (eidos-left ?handle)
+      of right      (eidos-right ?handle)
+      of interact   (eidos-interact ?handle)
+      of click      (eidos-click ?handle (:X ?params) (:Y ?params))
+      of undo       (eidos-undo ?handle)
+      else          (signal Failure :Text ($ "Eidos: unknown action" ?action))))
+
+)
+
+;;; -------- end of file -------

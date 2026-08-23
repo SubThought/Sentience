@@ -1,0 +1,111 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; Eidos.daicho — Eidos Psyche Configuration
+;;;
+;;; Settings for the ARC-AGI-3 interface.
+;;; The API key is stored here as a credential.
+;;;
+;;; To obtain an API key:
+;;;   1. Go to https://three.arcprize.org/user
+;;;   2. Create an account or sign in
+;;;   3. Copy your API key
+;;;   4. Paste it below in [API :Key]
+;;;
+;;; The key is passed to the ARC-AGI-3 REST API in the
+;;; Authorization header of every request.  It is also
+;;; registered with the GIL Registrar as the device
+;;; credential, so it accompanies every PERCEPT/RESULT/URGE
+;;; tuple as the :Token slot.
+;;;
+
+(settings Eidos {1 0 0}
+  memo "Eidos — the ARC-AGI-3 Psyche for GIL."
+
+
+  ;;; ════════════════════════════════════════════════════════════
+  ;;; §1  PSYCHE AGENT
+  ;;;
+  ;;; :Delay is slow because the world is turn-based.
+  ;;; The job only checks connection health.
+  ;;; ════════════════════════════════════════════════════════════
+
+  [Psyche
+    :Url        "locus://sol.earth.orb.local.host/mind/eidos"
+    :Port       2300
+    :Delay      \@m{60}
+    :Modality   Eidos
+  ]
+
+
+  ;;; ════════════════════════════════════════════════════════════
+  ;;; §2  ARC-AGI-3 API
+  ;;;
+  ;;; :Url    — the ARC-AGI-3 REST endpoint
+  ;;; :Key    — your API key from https://three.arcprize.org/user
+  ;;;
+  ;;; If no key is provided, an anonymous key is used.
+  ;;; Anonymous keys have reduced rate limits and no access
+  ;;; to public games at release.
+  ;;; ════════════════════════════════════════════════════════════
+
+  [API
+    :Url        "https://three.arcprize.org"
+    :Key        ""
+  ]
+
+
+  ;;; ════════════════════════════════════════════════════════════
+  ;;; §3  GRID FORMAT
+  ;;;
+  ;;; How the 64×64 grid is delivered in percepts.
+  ;;;
+  ;;;   raw    — flat list of 4096 integers (default)
+  ;;;            simplest, no processing, full spatial data
+  ;;;            use when detectors need the complete grid
+  ;;;
+  ;;;   sparse — list of {:I index :C color} for non-zero cells
+  ;;;            compact for mostly-empty grids
+  ;;;            loses direct spatial structure
+  ;;;
+  ;;;   rle    — run-length encoded {count color count color ...}
+  ;;;            compact for grids with large uniform regions
+  ;;;            preserves scan order
+  ;;;
+  ;;; Grid format can be changed at runtime via eidos-set-grid-format.
+  ;;; ════════════════════════════════════════════════════════════
+
+  [Grid
+    :Format     raw
+  ]
+
+
+  ;;; ════════════════════════════════════════════════════════════
+  ;;; §4  URGES
+  ;;;
+  ;;; Homeostatic thresholds for the Eidos world.
+  ;;;
+  ;;; :Efficiency — triggers when the agent's action count
+  ;;;              exceeds the human baseline by this multiplier.
+  ;;;              RHAE = (human / agent)². At 3× human actions,
+  ;;;              RHAE = 0.11 — very inefficient.
+  ;;; ════════════════════════════════════════════════════════════
+
+  [Urges
+    :ConnectionLost  {:Need connectivity  :Source Grid  :Threshold 1.0}
+    :Inefficiency    {:Need efficiency    :Source Grid  :Threshold 3.0}
+  ]
+
+)

@@ -1,0 +1,33 @@
+;;; *************************************************************************************
+;;;  reflection.patterns — Reflection component manifest.
+;;;
+;;;  Motivation, simulation, regulation, compensation, exploration, discovery.
+;;;  This is where an Attempt becomes evidence and a failure becomes a
+;;;  question.
+;;; *************************************************************************************
+
+(theory Reflection {2 0 0}
+
+  "Reflection — motivation, simulation, regulation, compensation, exploration, discovery."
+
+  (require  Reflection  from  "../pattern/motivating.pattern"    or abort)
+  (require  Reflection  from  "../pattern/simulating.pattern"    or abort)
+  (require  Reflection  from  "../pattern/regulating.pattern"    or abort)
+  (require  Reflection  from  "../pattern/compensating.pattern"  or abort)
+  (require  Reflection  from  "../pattern/exploring.pattern"     or abort)
+  (require  Reflection  from  "../pattern/discovering.pattern"   or abort)
+
+  (function reflect {}
+    "Start all reflection mechanisms."
+    (trace "[Reflection] starting")
+    (map { Ameliorator  Supervisor  Critic  Inhibitor
+           Correlator   Regulator   Terminator
+           Compensator  Explorer    Elaborator
+           Ascriber     Predictor   Experimenter }
+         (given {?m} (call start ?m)))
+    (trace "[Reflection] running")
+    reflecting)
+
+) ;; end theory Reflection
+
+;;; ---------------  end of file -----------------
