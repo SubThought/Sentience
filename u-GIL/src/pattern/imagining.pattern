@@ -1,0 +1,79 @@
+;;; *************************************************************************************
+;;;  imagining.pattern — the canvas verbs (Coordination)
+;;;
+;;;  Imagination works on ephemeral COPIES.  Perceptual memory is never
+;;;  mutated, so perception and imagination stay separable and every memory
+;;;  answers "seen, or synthesised?" with a pointer.
+;;;
+;;;  A manipulation REBUILDS rather than edits, which means the stored :Ops
+;;;  are not a log ABOUT the dream — they ARE the dream.  f(scene, ops) is
+;;;  replayable, diffable, falsifiable.
+;;; *************************************************************************************
+
+(extend Coordination
+
+  ;; imagine-scene — clone a Scene's Objects into canvas Figments.
+  ;; Each Figment points back at the real Object it copies.
+  (function imagine-scene {long ?scene}
+    (var ?figs {})
+    (for ?o in (scene-of ?scene)
+      (set ?figs (append ?figs
+        (schema Figment { :Meshes {} :Clouds {} :Source (:M ?o) }))))
+    ?figs)
+
+  ;; canvas-from-scene — a fresh stage seeded from a memory.
+  (function canvas-from-scene {long ?scene}
+    (var ?figs   (imagine-scene ?scene))
+    (var ?canvas (schema Canvas { :Figments ?figs :Taxeis {} :Shots {}
+                                  :Venue (venue-of-scene ?scene) }))
+    (enable :reifiers {?canvas} :moment (moment) :reality Imagined)
+    ?canvas)
+
+  (function venue-of-scene {long ?scene}
+    (with [Scene :M = ?scene :Venue as ?v] give ?v else nil))
+
+  ;; imagine-venue — the imagined stage for a Venue, made once and
+  ;; reused.  The Navigator's waypoints are Taxis on these.
+  (function imagine-venue {long ?venue}
+    (with [Canvas :M as ?c :Venue = ?venue] give ?c
+      else
+      (do
+        (var ?canvas (schema Canvas { :Figments {} :Taxeis {} :Shots {}
+                                      :Venue ?venue }))
+        (enable :reifiers {?canvas} :moment (moment) :reality Imagined)
+        ?canvas)))
+
+  ;; venues-to-waypoints — turn a path of Venues into Taxis
+  ;; waypoints a Route can carry.
+  (function venues-to-waypoints {list ?venues}
+    (collect ?v in ?venues
+      list (schema Taxis { :Items {} :Method (L Show)
+                           :Canvas (imagine-venue ?v) :Venue ?v
+                           :Scene nil :Affects {} :Telon nil })))
+
+  ;; ── the manipulation verbs ────────────────────────────────
+  ;; Each returns a NEW Figment list; none mutates its input.
+
+  (function dream-move {list ?figs long ?target variant ?by}
+    (collect ?f in ?figs
+      list (if (= ?f ?target)
+               (schema Figment { :Meshes (:Meshes (premise ?f))
+                                 :Clouds (:Clouds (premise ?f))
+                                 :Source (:Source (premise ?f)) })
+               ?f)))
+
+  (function dream-remove {list ?figs long ?target}
+    (collect ?f in ?figs (/= ?f ?target) list ?f))
+
+  (function dream-duplicate {list ?figs long ?target}
+    (var ?out ?figs)
+    (for ?f in ?figs
+      (when (= ?f ?target)
+        (set ?out (append ?out
+          (schema Figment { :Meshes {} :Clouds {}
+                            :Source (:Source (premise ?f)) })))))
+    ?out)
+
+) ;; end extend Coordination
+
+;;; ---------------  end of file -----------------

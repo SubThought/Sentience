@@ -1,0 +1,137 @@
+;;; *************************************************************************************
+;;;  associating.pattern — co-occurrence and sequence (Coordination)
+;;;
+;;;  Two associators, one assembler.  These are what let the mind build
+;;;  structure ABOVE the percept without being told any of it.
+;;;
+;;;    UNISONER  things that keep happening together become a group.
+;;;    TANDEMER  things that keep happening in order become a sequence.
+;;;    ASSEMBLER a group that recurs becomes an Entity.
+;;;
+;;;  Tandem is NOT the spatial graph — Action schemes are the edges of that.
+;;;  Tandem is perceptual sequence: what tends to follow what, which is how
+;;;  episodes and expectations form.
+;;; *************************************************************************************
+
+(extend Coordination
+
+  (template Unison  { :Members {} } )
+  (template Tandem  { :Prior nil :Later nil } )
+  (template Entity  { :Members {} :Signature {} } )
+
+  ;; ── UNISONER ──────────────────────────────────────────────
+
+  (rule Unisoner
+    memo "Co-active schemes at one tier become a Unison."
+    domain Wisdom
+    salience 8000
+    with [Activation :M as ?any :Reality = Observed :Pulses > 0]
+    do
+      (var ?window (setting Registry Potentiation :ImmediatePotentiation))
+      (var ?tier   (choose-tier))
+      (var ?candidates
+        (with [Activation :M as ?m :Reality = Observed :Pulses > 0]
+              [Glue :M = ?m :Z = ?tier]
+          collect ?m))
+      (var ?members (clutch ?candidates))
+      (when (>= (# ?members) 2)
+        (unless (any [Unison :Members as ?e] (subset-p ?members ?e))
+          (var ?u (schema Unison { :Members ?members }))
+          (enable :reifiers {?u} :moment (moment) :reality Observed))))
+
+  ;; ── TANDEMER ──────────────────────────────────────────────
+
+  (rule Tandemer
+    memo "Sequentially active schemes at one tier become a Tandem."
+    domain Wisdom
+    salience 8000
+    with [Activation :M as ?a :Reality = Observed :Pulses > 0 :EnabledSince as ?ta]
+         [Activation :M as ?b :Reality = Observed :Pulses > 0 :EnabledSince as ?tb]
+         (/= ?a ?b)
+         (> ?tb ?ta)
+         [Glue :M = ?a :Z as ?za]
+         [Glue :M = ?b :Z as ?zb]
+         (= ?za ?zb)
+         (notany [Tandem :Prior = ?a :Later = ?b])
+    do
+      (var ?t (schema Tandem { :Prior ?a :Later ?b }))
+      (enable :reifiers {?t} :moment (moment) :reality Observed))
+
+  ;; choose-tier — sample from the busiest abstraction tiers, so
+  ;; association happens where the action is.
+  (function choose-tier {+ ?top := 3}
+    (var ?tiers
+      (distinct
+        (sort (with [Activation :M as ?m :Reality = Observed :Pulses > 0]
+                    [Glue :M = ?m :Z as ?gz]
+                collect ?gz)
+              descending)))
+    (first (pick (take ?tiers ?top) 1)))
+
+  ;; ── ASSEMBLER ─────────────────────────────────────────────
+  ;; A Unison that keeps recurring is not a coincidence; it is a
+  ;; thing.  Promote it, and give it a Glue position so radial
+  ;; propagation can find it.
+
+  (agent Assembler
+    (function {}
+      (var ?bar (setting Registry Discovery :UnisonHypothesisThreshold))
+      (with [Unison :M as ?u :Members as ?members]
+            [Case :Content = ?u :Count as ?n]
+            (>= ?n ?bar)
+        do
+        (unless (any [Entity :Signature as ?s] (subset-p ?members ?s))
+          (var ?e (schema Entity { :Members ?members :Signature ?members }))
+          (store ?e Entity ?members)
+          (knew Glue :M ?e :Z (tier-for (R Entity)))
+          (enable :reifiers {?e} :moment (moment) :reality Observed))))
+    "locus://sol.earth.orb.local.host/mind/assembler"
+    (function {?sender ?msg} told)
+    \@m{32})
+
+  ;; gluer — every scheme gets a position, so it can be reached
+  ;; by proximity as well as by edge.
+  (agent Gluer
+    (function {}
+      (with [Scheme :M as ?m :R as ?r]
+            (notany [Glue :M = ?m])
+        do (new Glue :M ?m :X 0 :Y 0 :Z (tier-for ?r) :Disp 0.1 :Temp 0)))
+    "locus://sol.earth.orb.local.host/mind/gluer"
+    (function {?sender ?msg} told)
+    \@m{5})
+
+  (agent Unisoner
+    (function {} (associate-unison))
+    "locus://sol.earth.orb.local.host/mind/unisoner"
+    (function {?sender ?msg} told)
+    \@m{32})
+
+  (agent Tandemer
+    (function {} (associate-tandem))
+    "locus://sol.earth.orb.local.host/mind/tandemer"
+    (function {?sender ?msg} told)
+    \@m{32})
+
+  ;; the same bodies, callable where rules do not fire
+  (function associate-unison {}
+    (var ?tier (choose-tier))
+    (var ?members
+      (clutch (with [Activation :M as ?m :Reality = Observed :Pulses > 0]
+                    [Glue :M = ?m :Z = ?tier]
+                collect ?m)))
+    (when (>= (# ?members) 2)
+      (unless (any [Unison :Members as ?e] (subset-p ?members ?e))
+        (enable :reifiers {(schema Unison { :Members ?members })}
+                :moment (moment) :reality Observed))))
+
+  (function associate-tandem {}
+    (with [Activation :M as ?a :Reality = Observed :Pulses > 0 :EnabledSince as ?ta]
+          [Activation :M as ?b :Reality = Observed :Pulses > 0 :EnabledSince as ?tb]
+          (and (/= ?a ?b) (> ?tb ?ta))
+      do (unless (any [Tandem :Prior = ?a :Later = ?b])
+           (enable :reifiers {(schema Tandem { :Prior ?a :Later ?b })}
+                   :moment (moment) :reality Observed))))
+
+) ;; end extend Coordination
+
+;;; ---------------  end of file -----------------

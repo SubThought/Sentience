@@ -1,0 +1,136 @@
+;;; *************************************************************************************
+;;;  exploring.pattern — curiosity (Reflection)
+;;;
+;;;  THE FRONTIER IS AN EMPTY :Result.
+;;;
+;;;  An Action whose postconditions are unknown is worth trying, because a
+;;;  single trial buys a whole transition model.  This is a better frontier
+;;;  than a ledger of untried pairs: a pair ledger EXHAUSTS, and when it does
+;;;  the mind treadmills.  An empty :Result REGENERATES — every composite the
+;;;  Automator breeds arrives with its consequences unknown.
+;;;
+;;;    EXPLORER    proposes an Action with no known Result.
+;;;    ELABORATOR  fills the Result in from what activated afterwards.
+;;;    PERSEVERATE re-proposes when the telon still is not satisfied.
+;;; *************************************************************************************
+
+(extend Reflection
+
+  ;; ── EXPLORER ──────────────────────────────────────────────
+
+  (rule Explorer
+    memo "Propose an Action whose postconditions are unknown."
+    domain Wisdom
+    salience 8000
+    with [Action :M as ?act :Context as ?ctx]
+         [Scheme :M = ?act :E as ?res]
+         (void-p ?res)
+         (every ?p in ?ctx (is-active ?p Observed))
+         (notany [Trial :Action = ?act :Doing = idle])
+         (notany [Attempt :Act as ?a :Exec = sent]
+                 [Action :M = ?act :Goals as ?g] (in ?a ?g))
+    do
+      (var ?t (schema Trial { :Action ?act :Basis Explorer :Dream nil
+                              :Doing idle :Moment (moment) }))
+      (enable :reifiers {?t} :moment (moment) :reality Desired))
+
+
+  ;; ── ELABORATOR ────────────────────────────────────────────
+  ;;
+  ;; The attempt finished.  Whatever became true just after is a
+  ;; candidate postcondition.  Chunked, because working memory is
+  ;; bounded and a 64x64 board activates far more than 7 things.
+  ;;
+  ;; This is accommodation in its plainest form: the model gains
+  ;; the structure the world just showed it.
+
+  (rule Elaborator
+    memo "Fill an Action's Result from what activated after the attempt."
+    domain Wisdom
+    salience 8000
+    with [Attempt :Act as ?actuation :Exec = done :When as ?when]
+         [Action :M as ?act :Goals as ?goals]
+         (in ?actuation ?goals)
+         [Scheme :M = ?act :E as ?res]
+         (void-p ?res)
+    do
+      (var ?candidates
+        (with [Activation :Reality = Observed :Pulses > 0
+                          :EnabledSince >= ?when :M as ?m]
+          collect ?m))
+      (var ?active (clutch ?candidates))
+      (when (more-p ?active)
+        (put [Action :M = ?act] :Result ?active)
+        (relate ?act (R Action) {} ?active)
+        (with [Scheme ^ as ?s :M = ?act] do (put ?s :E ?active))
+        (new Origin :M ?act :Provenance Edited :Mechanism Elaborator
+                    :Moment (moment))))
+
+  ;; clutch — a Miller-law sample of what became true.
+  (function clutch {list ?elements}
+    (var ?min (setting Registry Chunking :MinChunk))
+    (var ?max (setting Registry Chunking :MaxChunk))
+    (if (<= (# ?elements) ?max) ?elements
+        else (take ?elements (random ?min to ?max))))
+
+
+  ;; ── PERSEVERATE ───────────────────────────────────────────
+  ;; The act completed but the objective did not arrive.  Try it
+  ;; again — the lowest-priority proposal there is, so anything
+  ;; with a reason outweighs it.
+
+  (rule Perseverate
+    memo "Re-propose the last act when the telon is still unsatisfied."
+    domain Wisdom
+    salience 1
+    with [Agenda :Telon as ?telon :Exec = idle]
+         [Attempt :Telon = ?telon :Act as ?actuation :Exec = done]
+         (not (happening-p {?telon} (V Awareness) Observed))
+         [Action :M as ?act :Context as ?ctx :Goals as ?goals]
+         (in ?actuation ?goals)
+         (every ?p in ?ctx (is-active ?p Observed))
+    do
+      (var ?t (schema Trial { :Action ?act :Basis Perseverate :Dream nil
+                              :Doing idle :Moment (moment) }))
+      (enable :reifiers {?t} :moment (moment) :reality Desired))
+
+
+  ;; ── REQUESTIONER — accommodate the map itself ─────────────
+  ;;
+  ;; No frontier reachable and no route home.  Rather than
+  ;; treadmill, re-test the OLDEST belief about this place: the
+  ;; least recently confirmed edge.  Staleness-decayed confidence,
+  ;; applied to the graph instead of to a scheme.
+
+  (rule Requestioner
+    memo "When nothing is reachable, re-test the least recently confirmed edge."
+    domain Wisdom
+    salience 50
+    with [Agenda :Telon as ?telon :Plan = todo]
+         (no-frontier-p)
+    do
+      (var ?here (current-node))
+      (var ?stalest nil)
+      (var ?oldest  infinity)
+      (with [Action :M as ?a :Context as ?ctx]
+            (in ?here ?ctx)
+            [Usage :M = ?a :Used as ?u]
+        do (when (< ?u ?oldest) (do (set ?oldest ?u) (set ?stalest ?a))))
+      (when (thing-p ?stalest)
+        (var ?t (schema Trial { :Action ?stalest :Basis Requestioner
+                                :Dream nil :Doing idle :Moment (moment) }))
+        (enable :reifiers {?t} :moment (moment) :reality Desired)))
+
+  ;; no-frontier-p — is there any Action with an unknown Result
+  ;; whose preconditions currently hold?
+  (function no-frontier-p {}
+    (var ?any no)
+    (with [Action :M as ?a :Context as ?ctx]
+          [Scheme :M = ?a :E as ?res]
+          (void-p ?res)
+      do (when (every ?p in ?ctx (is-active ?p Observed)) (set ?any yes)))
+    (not ?any))
+
+) ;; end extend Reflection
+
+;;; ---------------  end of file -----------------

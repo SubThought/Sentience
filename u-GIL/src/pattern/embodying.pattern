@@ -1,0 +1,91 @@
+;;; *************************************************************************************
+;;;  embodying.pattern — Mind/Body (Observation)
+;;;
+;;;  The Registrar gives a device its token; the Executor turns a selected
+;;;  Trial into an ATTEMPT and dispatches it to the Psyche.
+;;;
+;;;  The Executor is where the decision leaves the mind.  It mints the
+;;;  Attempt row that the Action-Correlator will later settle — which is how
+;;;  the mind finds out whether what it did worked.
+;;; *************************************************************************************
+
+(extend Observation
+
+  ;; ── REGISTRAR ─────────────────────────────────────────────
+  ;; A device registers its channels, needs and actuations.  The
+  ;; returned token rides on every tuple that device produces.
+
+  (service Registrar
+    (setting Observation Registrar :Url)
+    (function {?sender ?message}
+      (var ?device     (:Device     ?message))
+      (var ?modality   (:Modality   ?message))
+      (var ?channels   (:Channels   ?message))
+      (var ?actuations (:Actuations ?message))
+
+      ;; Level 0 of the action ladder: one Actuation scheme per act
+      ;; the device offers.  The mind is not told what any of them
+      ;; do — that is what the Explorer is for.
+      (for ?a in ?actuations
+        (var ?act (schema Actuation { :Name ?a :Device ?device :Modality ?modality }))
+        (knew Capability :Action ?act :Enabled yes :Moment (moment)))
+
+      (var ?token (reifier))
+      (send ?sender {(self) [REGISTERED :Token ?token :Device ?device]})
+      told))
+
+
+  ;; ── EXECUTOR ──────────────────────────────────────────────
+  ;; Takes the Trial the Deliberator selected, mints the Attempt,
+  ;; and tells the Psyche.  Nothing else may dispatch.
+
+  (function execute {long ?trial}
+    (with [Trial :M = ?trial :Action as ?action :Basis as ?basis]
+      do
+      (with [Action :M = ?action :Goals as ?goals]
+        do
+        ;; the telon this trial serves — the highest-scoring agendum
+        (var ?telon nil)
+        (var ?best -1)
+        (with [Agenda ^ as ?ag :Telon as ?t]
+          do (var ?s (score ?ag))
+             (when (> ?s ?best) (do (set ?best ?s) (set ?telon ?t))))
+
+        (for ?actuation in ?goals
+          (when (with [Actuation :M = ?actuation] give yes else no)
+            (new Attempt :Trial ?trial :Telon ?telon :Act ?actuation
+                         :Exec sent :When (moment))
+            ;; count the try now; the Correlator counts the success later
+            (with [Utility ^ as ?u :M = ?action :Attempts as ?n]
+              do (put ?u :Attempts (+ ?n 1))
+              else (new Utility :M ?action :Attempts 1 :Successes 0
+                                :Moment (moment)))
+            (with [Actuation :M = ?actuation :Name as ?name :Device as ?dev]
+              do (attempt-out ?dev ?name ?basis))))
+
+        (put [Trial :M = ?trial] :Doing sent))))
+
+  ;; attempt-out — hand the ATTEMPT to the right Psyche.  The
+  ;; basis rides along as the reason, so the world's own log
+  ;; records WHY, not just what.
+  (function attempt-out {literal ?device literal ?action variant ?basis}
+    (var ?url (case ?device
+                of Eidos   (setting Eidos   Psyche :Url)
+                of Expanse (setting Expanse Psyche :Url)
+                else nil))
+    (when (thing-p ?url)
+      (tell ?url [ATTEMPT :Action ?action :Parameters {}
+                          :Reason ?basis :By nil])))
+
+  (agent Executor
+    (function {}
+      (with [Trial :M as ?t :Doing = todo]
+        do (execute ?t)))
+    (setting Observation Executor :Url)
+    (function {?sender ?msg} told)
+    \@m{1}
+    {acting})
+
+) ;; end extend Observation
+
+;;; ---------------  end of file -----------------

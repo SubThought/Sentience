@@ -1,0 +1,206 @@
+;;; *************************************************************************************
+;;;  locating.pattern — building the spatial hierarchy (Coordination)
+;;;
+;;;  Seven levels, Scene at the bottom and Map at the top.  The GRAMMAR is
+;;;  given; the CONTENTS are learned, in either world:
+;;;
+;;;     Level   Eidos                    Expanse
+;;;     Map     the whole game           the site
+;;;     Region  a quadrant of a level    a building
+;;;     Area    a corridor system        a floor
+;;;     Place   an arrangement           a spot: by the door
+;;;     Locale  a chamber of the maze    the kitchen
+;;;     Venue   the board                the room
+;;;     Scene   one frame's regions      one camera field
+;;;
+;;;  LOCATER builds bottom-up from what is perceived.
+;;;  MAPPER accumulates top-down as new groupings are met.
+;;;
+;;;  Why it matters beyond the robot: a forty-step journey at PLACE
+;;;  granularity is beyond any bounded walk.  The same journey is three hops
+;;;  at LOCALE granularity.  u-GIL 1.0's wall was a missing level of
+;;;  abstraction, not a missing route.
+;;; *************************************************************************************
+
+(extend Coordination
+
+  ;; current-venue — the Venue active in Observed, or nil.
+  (function current-venue {}
+    (with [Scheme :M as ?v :R = (R Venue)]
+          [Activation :M = ?v :Reality = Observed :Pulses > 0]
+      give ?v else nil))
+
+  ;; current-place — the Place active in Observed, or nil.
+  (function current-place {}
+    (with [Scheme :M as ?p :R = (R Place)]
+          [Activation :M = ?p :Reality = Observed :Pulses > 0]
+      give ?p else nil))
+
+  ;; landmarks-of — the identifying signature of a Scene: those
+  ;; of its Objects that do NOT move under action.  In Eidos that
+  ;; is the static furniture; in Expanse the fixed features of a
+  ;; room.  Same predicate, different detector upstream.
+  (function landmarks-of {long ?scene}
+    (var ?marks {})
+    (with [Scene :M = ?scene :Objects as ?ors]
+      do (for ?or in ?ors
+           (with [Object :M = ?or :Class as ?cl]
+             do (unless (mover-p ?or)
+                  (set ?marks (append ?marks ?or))))))
+    ?marks)
+
+  ;; mover-p — has this object ever been observed to move under an
+  ;; action?  Learned, never declared.  It is also how the mind
+  ;; separates BODY state from WORLD state.
+  (function mover-p {long ?object}
+    (with [Scheme :M as ?a :R = (R Action) :E as ?res]
+          (in ?object ?res)
+      deem yes else no))
+
+
+  ;; ── LOCATER ───────────────────────────────────────────────
+  ;;
+  ;; A Scene arrives.  Either its landmarks match a Venue we have
+  ;; been in — recognise it, and this Scene joins that Venue — or
+  ;; they do not, and a new Venue is born.
+  ;;
+  ;; Recognition uses the IDENTITY bar, not the assimilation bar.
+  ;; Being roughly where you were is not being where you were.
+
+  (rule Locate-Recognise
+    memo "An arriving Scene whose landmarks match a known Venue joins it."
+    domain Wisdom
+    salience 9000
+    with [Scene :M as ?scene :Venue = nil]
+         [Activation :M = ?scene :Reality = Observed :Pulses > 0]
+    do
+      (var ?marks (landmarks-of ?scene))
+      (when (more-p ?marks)
+        (var ?venue (recognise ?marks Venue
+                      (setting Registry Locating :LandmarkScore)))
+        (when (thing-p ?venue)
+          (put [Scene :M = ?scene] :Venue ?venue)
+          (with [Venue ^ as ?v :M = ?venue :Scenes as ?ss]
+            do (put ?v :Scenes (append ?ss {?scene})))
+          (enable :reifiers {?venue} :moment (moment) :reality Observed))))
+
+  (rule Locate-NewVenue
+    memo "A Scene whose landmarks match nothing known births a Venue."
+    domain Wisdom
+    salience 8900
+    with [Scene :M as ?scene :Venue = nil]
+         [Activation :M = ?scene :Reality = Observed :Pulses > 0]
+    do
+      (var ?marks (landmarks-of ?scene))
+      (when (more-p ?marks)
+        (unless (thing-p (recognise ?marks Venue
+                           (setting Registry Locating :LandmarkScore)))
+          (var ?venue (schema Venue { :Scenes {?scene} :Landmarks ?marks
+                                      :Locale nil }))
+          (store ?venue Venue ?marks)
+          (put [Scene :M = ?scene] :Venue ?venue)
+          (enable :reifiers {?venue} :moment (moment) :reality Observed)
+          (new Origin :M ?venue :Provenance Made :Mechanism Locater
+                      :Moment (moment)))))
+
+  ;; Place — a recognisable position WITHIN a Venue.  In Eidos the
+  ;; signature is the controllable arrangement: which movers are
+  ;; where.  In Expanse it is the pose.  The relation is the same.
+
+  (rule Locate-Place
+    memo "A recurring mover configuration inside a Venue becomes a Place."
+    domain Wisdom
+    salience 8800
+    with [Scene :M as ?scene :Venue as ?venue]
+         (thing-p ?venue)
+         [Activation :M = ?scene :Reality = Observed :Pulses > 0]
+    do
+      (var ?sig (mover-signature ?scene))
+      (when (more-p ?sig)
+        (var ?place (identical ?sig Place))
+        (if (thing-p ?place)
+            (enable :reifiers {?place} :moment (moment) :reality Observed)
+         else
+            (do
+              (var ?p (schema Place { :Locales {} :Signature ?sig :Area nil }))
+              (store ?p Place ?sig)
+              (enable :reifiers {?p} :moment (moment) :reality Observed)
+              (new Origin :M ?p :Provenance Made :Mechanism Locater
+                          :Moment (moment))))))
+
+  ;; mover-signature — the Objects in this Scene that DO move.
+  (function mover-signature {long ?scene}
+    (var ?sig {})
+    (with [Scene :M = ?scene :Objects as ?ors]
+      do (for ?or in ?ors
+           (when (mover-p ?or) (set ?sig (append ?sig ?or)))))
+    ?sig)
+
+
+  ;; ── MAPPER ────────────────────────────────────────────────
+  ;;
+  ;; Accumulates the upper levels top-down.  Whenever enough
+  ;; children of one level are known and unassigned, group them
+  ;; into a parent.  Miller's law bounds the grouping, so the
+  ;; hierarchy stays shallow and navigable.
+
+  (function map-up {literal ?child literal ?parent slot ?up slot ?down}
+    (var ?min (setting Registry Mapping :MinChunk))
+    (var ?orphans
+      (with [Scheme :M as ?m :R = (R ?child)]
+            (null-p (slot-of ?m ?up))
+        list ?m))
+    (when (>= (# ?orphans) ?min)
+      (for ?group in (chunk-partition ?orphans
+                       (setting Registry Mapping :MinChunk)
+                       (setting Registry Mapping :MaxChunk))
+        (var ?parent-monad (apply schema ?parent { ?down ?group }))
+        (for ?c in ?group (apply put [?child :M = ?c] ?up ?parent-monad))
+        (enable :reifiers {?parent-monad} :moment (moment) :reality Observed)
+        (new Origin :M ?parent-monad :Provenance Made :Mechanism Mapper
+                    :Moment (moment)))))
+
+  (function slot-of {long ?m slot ?slot}
+    (with [Scheme :M = ?m] give (get (premise ?m) ?slot) else nil))
+
+  (agent Mapper
+    (function {}
+      (map-up Venue  Locale    :Locale :Venues)
+      (map-up Locale Place     :Place  :Locales)
+      (map-up Place  Area      :Area   :Places)
+      (map-up Area   Region    :Region :Areas)
+      (map-up Region MapLevel  :Map    :Regions))
+    "locus://sol.earth.orb.local.host/mind/mapper"
+    (function {?sender ?msg} told)
+    \@m{32})
+
+  ;; The Locater rules above are driven by (think).  Where the
+  ;; rules engine is unavailable, this agent calls the same
+  ;; bodies directly — one implementation, two drivers.
+  (agent Locater
+    (function {}
+      (with [Scene :M as ?scene :Venue = nil]
+            [Activation :M = ?scene :Reality = Observed :Pulses > 0]
+        do (locate-scene ?scene)))
+    "locus://sol.earth.orb.local.host/mind/locater"
+    (function {?sender ?msg} told)
+    \@m{2})
+
+  (function locate-scene {long ?scene}
+    (var ?marks (landmarks-of ?scene))
+    (when (more-p ?marks)
+      (var ?venue (recognise ?marks Venue
+                    (setting Registry Locating :LandmarkScore)))
+      (if (thing-p ?venue)
+          (do (put [Scene :M = ?scene] :Venue ?venue)
+              (enable :reifiers {?venue} :moment (moment) :reality Observed))
+       else
+          (do (var ?v (schema Venue { :Scenes {?scene} :Landmarks ?marks
+                                      :Locale nil }))
+              (store ?v Venue ?marks)
+              (put [Scene :M = ?scene] :Venue ?v)
+              (enable :reifiers {?v} :moment (moment) :reality Observed)))))
+
+) ;; end extend Coordination
+
+;;; ---------------  end of file -----------------

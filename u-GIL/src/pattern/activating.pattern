@@ -1,0 +1,124 @@
+;;; *************************************************************************************
+;;;  activating.pattern — the activation substrate (Coordination)
+;;;
+;;;  Five mechanisms.  One service writes activation; one agent expires it;
+;;;  three spread it, one per reality, in three different directions.
+;;;
+;;;    Observer     upward    in Observed   — what follows from what is true
+;;;    Anticipator  downward  in Expected   — what should follow from what I do
+;;;    Reminder     radial    in Recalled   — what is near what I am thinking of
+;;;    Dreamer      upward    in Imagined   — what follows in rehearsal
+;;;
+;;;  Observer and Anticipator run at the same rate in opposite directions.
+;;;  The difference between the Observed and Expected activation arriving at
+;;;  a scheme is the phasic residual — the surprise that triggers
+;;;  accommodation.  That is the whole prediction mechanism.
+;;; *************************************************************************************
+
+(extend Coordination
+
+  ;; ── ACTIVATOR — reactive service ──────────────────────────
+  ;; Everything that changes activation goes through here, so the
+  ;; decision layer has exactly one writer.
+
+  (service Activator
+    (setting u-GIL Agency :Url)
+    (function {?sender ?msg}
+      (var ?vp (default (:Viewpoint ?msg) (V Awareness)))
+      (var ?rl (default (:Reality   ?msg) Observed))
+      (var ?mo (default (:Moment    ?msg) (moment)))
+      (case (:Type ?msg)
+        of enable (enable :reifiers (:Reifiers ?msg) :moment ?mo
+                          :viewpoint ?vp :reality ?rl)
+        of impede (impede :reifiers (:Reifiers ?msg) :moment ?mo
+                          :viewpoint ?vp :reality ?rl))
+      told))
+
+
+  ;; ── CRONOS — expiry ───────────────────────────────────────
+  ;; Decay is what makes intent revisable.  A proposal nobody
+  ;; re-endorses fades; a proposal several agents keep endorsing
+  ;; persists across ticks.  This is the difference between
+  ;; commitment and stubbornness.
+
+  (agent Cronos
+    (function {}
+      (var ?now    (moment))
+      (var ?window (setting Registry Potentiation :ActivationWindow))
+      (with [Activation ^ as ?a :Pulses as ?p
+                        :EnabledUntil as ?eu :ImpededUntil as ?iu]
+            (or (and (> ?p 0) (> ?now (+ ?eu ?window)))
+                (and (< ?p 0) (> ?now (+ ?iu ?window))))
+        do (put ?a :Pulses 0)))
+    "locus://sol.earth.orb.local.host/mind/cronos"
+    (function {?sender ?msg} told)
+    \@m{50})
+
+
+  ;; ── OBSERVER — upward, Observed ───────────────────────────
+  ;; Argument -> reifier -> referent.  When an Action's :Context
+  ;; and :Goals are active, the Action fires and its :Result is
+  ;; enabled: doing it makes its consequences true.
+
+  (agent Observer
+    (function {}
+      (var ?now (moment))
+      (with [Activation :Reality = Observed :Pulses as ?p :M as ?r]
+            (> ?p 0)
+        do (propagate-upward ?r ?now Observed)))
+    "locus://sol.earth.orb.local.host/mind/observer"
+    (function {?sender ?msg} told)
+    \@m{1})
+
+
+  ;; ── ANTICIPATOR — downward, Expected ──────────────────────
+  ;; Referent -> reifier -> argument.  An Action enabled in
+  ;; Expected enables its :Result in Expected.  THIS IS THE
+  ;; FORWARD MODEL — no separate transition table exists or is
+  ;; needed.
+
+  (agent Anticipator
+    (function {}
+      (var ?now (moment))
+      (with [Activation :Reality = Expected :Pulses as ?p :M as ?r]
+            (> ?p 0)
+        do (propagate-downward ?r ?now Expected)))
+    "locus://sol.earth.orb.local.host/mind/anticipator"
+    (function {?sender ?msg} told)
+    \@m{1})
+
+
+  ;; ── REMINDER — radial, Recalled ───────────────────────────
+  ;; Spread by Glue proximity.  Slower, because association is
+  ;; not urgent.
+
+  (agent Reminder
+    (function {}
+      (var ?now (moment))
+      (var ?radius (setting Registry Locating :DisplacementThreshold))
+      (with [Activation :Reality = Recalled :Pulses as ?p :M as ?r]
+            (> ?p 0)
+        do (propagate-radial ?r ?now Recalled 5.0)))
+    "locus://sol.earth.orb.local.host/mind/reminder"
+    (function {?sender ?msg} told)
+    \@m{5})
+
+
+  ;; ── DREAMER — upward, Imagined ────────────────────────────
+  ;; Rehearsal runs on the same machinery as perception, in its
+  ;; own reality, so nothing imagined can contaminate what is
+  ;; observed.
+
+  (agent Dreamer
+    (function {}
+      (var ?now (moment))
+      (with [Activation :Reality = Imagined :Pulses as ?p :M as ?r]
+            (> ?p 0)
+        do (propagate-upward ?r ?now Imagined)))
+    "locus://sol.earth.orb.local.host/mind/dreamer"
+    (function {?sender ?msg} told)
+    \@m{10})
+
+) ;; end extend Coordination
+
+;;; ---------------  end of file -----------------

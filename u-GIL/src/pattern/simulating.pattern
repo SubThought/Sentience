@@ -1,0 +1,183 @@
+;;; *************************************************************************************
+;;;  simulating.pattern — rehearsal before commitment (Reflection)
+;;;
+;;;  Nothing reaches Desired without passing the Critic.
+;;;
+;;;    SUPERVISOR  gates rehearsal on mood — a mind under stress acts, a calm
+;;;                one can afford to imagine.
+;;;    IMAGINER    forks the current Scene into a Taxis and enables it in
+;;;                Imagined, then lets the Dreamer propagate the consequences.
+;;;    CRITIC      asks whether the telon holds in Imagined.  Satisfied ->
+;;;                promote to Desired.  Not -> impede; the daydream is
+;;;                discarded and no action is spent on it.
+;;;    INHIBITOR   vetoes an act the model predicts does nothing.
+;;;    BUDGETER    vetoes a commitment the remaining budget cannot complete.
+;;;
+;;;  Because a dream is just a scheme in its own reality, rehearsal is a
+;;;  QUERY — happening-p — not a hand-built diff.  And because Imagined is
+;;;  separate from Observed, imagination can never contaminate perception.
+;;; *************************************************************************************
+
+(extend Reflection
+
+  ;; ── SUPERVISOR ────────────────────────────────────────────
+
+  (agent Supervisor
+    (function {}
+      (with [Emotion :M = (V Awareness) :Arousal as ?a :Valence as ?v]
+        do
+        (var ?calm (and (<= ?a 0) (>= ?v 0)))
+        (with [Registry ^ as ?reg :Key = Imagining]
+          do (put ?reg :Value (if ?calm yes no))
+          else (new Registry :Key Imagining :Value (if ?calm yes no)
+                             :Memo "The Supervisor gates rehearsal."))))
+    "locus://sol.earth.orb.local.host/mind/supervisor"
+    (function {?sender ?msg} told)
+    \@m{200})
+
+
+  ;; ── IMAGINER — fork the scene, run it forward ─────────────
+  ;;
+  ;; Enable the candidate Action in Imagined and let the Dreamer's
+  ;; upward propagation carry its :Result through.  That IS the
+  ;; prediction; there is nothing else to compute.
+
+  (function rehearse {long ?action}
+    (var ?scene (current-scene))
+    (when (thing-p ?scene)
+      (var ?taxis (schema Taxis { :Items (scene-figments ?scene)
+                                  :Method (L Show) :Canvas nil
+                                  :Venue (current-venue) :Scene ?scene
+                                  :Affects {} :Telon ?action }))
+      (enable :reifiers {?taxis ?action} :moment (moment) :reality Imagined)
+      ?taxis))
+
+  (function current-scene {}
+    (with [Scheme :M as ?s :R = (R Scene)]
+          [Activation :M = ?s :Reality = Observed :Pulses > 0]
+      give ?s else nil))
+
+  ;; scene-figments — an imagined stand-in per real Object, each
+  ;; carrying a pointer back to what it stands for.  Provenance is
+  ;; structural: every memory answers "seen or synthesised?".
+  (function scene-figments {long ?scene}
+    (var ?figs {})
+    (with [Scene :M = ?scene :Objects as ?ors]
+      do (for ?or in ?ors
+           (set ?figs (append ?figs
+             (schema Figment { :Meshes {} :Clouds {} :Source ?or })))))
+    ?figs)
+
+  (agent Imaginer
+    (function {}
+      (with [Registry :Key = Imagining :Value = yes]
+        do
+        ;; rehearse any Action that could reach a standing telon
+        (with [Agenda :Telon as ?telon :Plan = todo]
+              [Scheme :M as ?act :R = (R Action) :E as ?res]
+              (in ?telon ?res)
+              (notany [Trial :Action = ?act :Doing = idle])
+          do
+          (var ?taxis (rehearse ?act))
+          (when (thing-p ?taxis)
+            (var ?t (schema Trial { :Action ?act :Basis Imaginer
+                                    :Dream ?taxis :Doing wait
+                                    :Moment (moment) }))
+            (enable :reifiers {?t} :moment (moment) :reality Imagined)))))
+    "locus://sol.earth.orb.local.host/mind/imaginer"
+    (function {?sender ?msg} told)
+    \@m{10})
+
+
+  ;; ── CRITIC — the promotion gate ───────────────────────────
+  ;;
+  ;; Rehearse first; act only if the rehearsal succeeded.  A
+  ;; doomed commitment is vetoed HERE, before any budget gate has
+  ;; to catch it downstream.
+
+  (rule Critic
+    memo "Promote a rehearsal that satisfies its telon; discard one that does not."
+    domain Wisdom
+    salience 9700
+    with [Trial ^ as ?trial :M as ?t :Action as ?act :Dream as ?taxis
+                :Doing = wait]
+         (thing-p ?taxis)
+         [Activation :M = ?t :Reality = Imagined :Pulses > 0]
+    do
+      (var ?telon (current-telon))
+      (var ?satisfied
+        (if (null-p ?telon) no
+            (happening-p {?telon} (V Awareness) Imagined)))
+      (if ?satisfied
+          (do
+            ;; the rehearsal worked — let it stand for selection
+            (put ?trial :Doing idle)
+            (enable :reifiers {?t} :moment (moment) :reality Desired)
+            (trace "[Critic] promoted a rehearsal to Desired"))
+       else
+          (do
+            (impede :reifiers {?t ?taxis} :moment (moment) :reality Imagined)
+            (put ?trial :Doing fail)
+            (trace "[Critic] discarded an unsatisfactory rehearsal"))))
+
+  (agent Critic
+    (function {}
+      (with [Trial ^ as ?trial :M as ?t :Dream as ?taxis :Doing = wait]
+            (thing-p ?taxis)
+        do (criticise ?t)))
+    "locus://sol.earth.orb.local.host/mind/critic"
+    (function {?sender ?msg} told)
+    \@m{2})
+
+  (function criticise {long ?trial}
+    (var ?telon (current-telon))
+    (if (and (thing-p ?telon) (happening-p {?telon} (V Awareness) Imagined))
+        (do (put [Trial :M = ?trial] :Doing idle)
+            (enable :reifiers {?trial} :moment (moment) :reality Desired))
+     else
+        (do (impede :reifiers {?trial} :moment (moment) :reality Imagined)
+            (put [Trial :M = ?trial] :Doing fail))))
+
+
+  ;; ── INHIBITOR — do not spend an act on a known no-op ───────
+
+  (rule Inhibitor
+    memo "Impede a proposal the model predicts changes nothing here."
+    domain Wisdom
+    salience 9900
+    with [Trial :M as ?t :Action as ?act :Doing = idle]
+         [Scheme :M = ?act :E as ?res]
+         (more-p ?res)
+         (every ?r in ?res (is-active ?r Observed))     ; already true
+    do
+      (impede :reifiers {?t} :moment (moment) :reality Desired))
+
+
+  ;; ── BUDGETER — refuse what cannot be finished ─────────────
+  ;;
+  ;; Some worlds reset the body on a timer.  The budget is
+  ;; LEARNABLE: the resets are visible as teleports, and the
+  ;; settles between them are the life.  Inert until two gaps
+  ;; agree — one gap is a fluke.
+
+  (relation BudgetStat
+    :Device
+    :Life     0    ; learned actions per life
+    :Since    0    ; settles since the last reset
+    :Gaps     {}   ; observed inter-reset gaps
+    :Moment   0
+  )
+
+  (rule Budgeter
+    memo "Impede a commitment the remaining learned budget cannot complete."
+    domain Wisdom
+    salience 9880
+    with [Trial :M as ?t :Action as ?act :Doing = idle]
+         [BudgetStat :Life as ?life :Since as ?since]
+         (>= (# (get (premise ?act) :Goals)) (- ?life ?since))
+    do
+      (impede :reifiers {?t} :moment (moment) :reality Desired))
+
+) ;; end extend Reflection
+
+;;; ---------------  end of file -----------------

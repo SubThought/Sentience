@@ -1,0 +1,164 @@
+;;; *************************************************************************************
+;;;  navigating.pattern — routes over the mind's own graph (Coordination)
+;;;
+;;;  THE HORIZON FIX, and the reason u-GIL 2.0 needs no imported waypoints.
+;;;
+;;;  The edges of the spatial graph are ACTION SCHEMES: :Context is the
+;;;  source level-monad, :Result the destination.  Every settled Attempt
+;;;  lays one down.  find-path walks them.
+;;;
+;;;  Crucially the walk happens at the HIGHEST level that has edges.  Forty
+;;;  single steps at Place granularity is beyond any bounded search; the
+;;;  same journey is three hops at Locale granularity.  The Navigator plans
+;;;  high, then the Planner decomposes each hop downward.
+;;; *************************************************************************************
+
+(extend Coordination
+
+  ;; ── the graph ─────────────────────────────────────────────
+
+  ;; edges-from — the Actions whose :Context contains this node.
+  ;; Returns {(idiom :Act a :To destination)}.
+  (function edges-from {long ?node}
+    (var ?out {})
+    (with [Action :M as ?a :Context as ?ctx :Goals as ?goals]
+          (in ?node ?ctx)
+          [Scheme :M = ?a :E as ?res]
+          (more-p ?res)
+      do (set ?out (append ?out (idiom :Act ?a :To (first ?res)))))
+    ?out)
+
+  ;; level-of — which of the seven levels is this monad?
+  (function level-of {long ?m}
+    (with [Scheme :M = ?m :R as ?r]
+          (spatial-relation-p ?r)
+      give ?r else nil))
+
+  ;; planning-level — the highest level that has enough edges to
+  ;; be worth searching.  This is the abstraction choice, made
+  ;; from evidence rather than declared.
+  (function planning-level {}
+    (var ?best (R Place))
+    (for ?lv in {(R Place) (R Locale) (R Area) (R Region)}
+      (var ?n 0)
+      (with [Scheme :M as ?m :R = ?lv]
+        do (when (more-p (edges-from ?m)) (set ?n (+ ?n 1))))
+      (when (>= ?n 2) (set ?best ?lv)))
+    ?best)
+
+
+  ;; ── find-path ─────────────────────────────────────────────
+  ;; Breadth-first over OBSERVED edges only.  Returns an ordered
+  ;; list of nodes from source to destination, or nil.  This is
+  ;; the whole of what an imported waypoint file used to supply,
+  ;; computed from the mind's own experience.
+
+  (function find-path {long ?source long ?destination}
+    (var ?max     (setting Registry Navigation :MaxDepth))
+    (var ?queue   {{?source}})
+    (var ?visited {?source})
+    (var ?depth   0)
+    (var ?answer  nil)
+    (while (and (more-p ?queue) (< ?depth ?max) (null-p ?answer))
+      (var ?path    (first ?queue))
+      (set ?queue   (rest ?queue))
+      (var ?current (last ?path))
+      (if (= ?current ?destination)
+          (set ?answer ?path)
+       else
+          (for ?e in (edges-from ?current)
+            (var ?next (:To ?e))
+            (unless (in ?visited ?next)
+              (set ?visited (append ?visited {?next}))
+              (set ?queue   (append ?queue {(append ?path {?next})})))))
+      (set ?depth (+ ?depth 1)))
+    ?answer)
+
+
+  ;; ── NAVIGATOR ─────────────────────────────────────────────
+  ;;
+  ;; Two modes.  REPLAY: a Route to this destination already
+  ;; exists — propose its next leg.  PLANNING: none does — walk
+  ;; the graph, mint one, then propose.
+  ;;
+  ;; The Navigator PROPOSES.  It enables a Trial in Desired like
+  ;; any other proposer; it does not decide.
+
+  (function navigate-to {long ?destination}
+    (var ?rt (route-for ?destination))
+
+    ;; plan if we have no route
+    (when (null-p ?rt)
+      (var ?here (current-node))
+      (when (thing-p ?here)
+        (var ?path (find-path ?here ?destination))
+        (when (thing-p ?path)
+          (set ?rt (schema Route { :Waypoints ?path
+                                   :Level     (level-of ?here)
+                                   :Current   0
+                                   :Tries     0
+                                   :Loop      (R Once)
+                                   :Destination ?destination }))
+          (enable :reifiers {?rt} :moment (moment) :reality Observed)
+          (new Origin :M ?rt :Provenance Made :Mechanism Navigator
+                      :Moment (moment)))))
+
+    ;; propose the next leg
+    (when (thing-p ?rt)
+      (propose-leg ?rt)))
+
+  ;; current-node — where the body is, at the planning level.
+  (function current-node {}
+    (var ?lv (planning-level))
+    (with [Scheme :M as ?m :R = ?lv]
+          [Activation :M = ?m :Reality = Observed :Pulses > 0]
+      give ?m else (current-place)))
+
+  ;; propose-leg — find the Action that crosses to the next
+  ;; waypoint and enable a Trial for it in Desired.
+  (function propose-leg {long ?route}
+    (with [Route ^ as ?r :M = ?route :Waypoints as ?wps
+                 :Current as ?cur :Tries as ?tries]
+      do
+      (var ?patience (setting Registry Navigation :RouteRetries))
+      (if (> ?tries ?patience)
+          ;; this leg is not working — retire the route so some
+          ;; other proposer gets a turn, and let the Compensator
+          ;; look for a detour
+          (impede :reifiers {?route} :moment (moment) :reality Observed)
+       else
+          (do
+            (var ?here (current-node))
+            (var ?next (@ ?wps (+ ?cur 1)))
+
+            ;; arrived at this waypoint? advance and reset patience
+            (when (= ?here ?next)
+              (put ?r :Current (+ ?cur 1) :Tries 0)
+              (set ?next (@ ?wps (+ ?cur 2))))
+
+            (when (thing-p ?next)
+              (with [Action :M as ?a :Context as ?ctx]
+                    (in ?here ?ctx)
+                    [Scheme :M = ?a :E as ?res]
+                    (in ?next ?res)
+                do
+                (var ?trial (schema Trial { :Action ?a :Basis Navigator
+                                            :Dream nil :Doing todo
+                                            :Moment (moment) }))
+                (enable :reifiers {?trial ?a} :moment (moment) :reality Desired)
+                (put ?r :Tries (+ ?tries 1))))))))
+
+  (agent Navigator
+    (function {}
+      ;; every destination the mind currently wants
+      (with [Agenda :Telon as ?telon :Plan = todo]
+            [Scheme :M = ?telon :R as ?rel]
+            (spatial-relation-p ?rel)
+        do (navigate-to ?telon)))
+    "locus://sol.earth.orb.local.host/mind/navigator"
+    (function {?sender ?msg} told)
+    \@m{5})
+
+) ;; end extend Coordination
+
+;;; ---------------  end of file -----------------

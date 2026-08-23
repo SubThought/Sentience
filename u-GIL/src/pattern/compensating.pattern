@@ -1,0 +1,80 @@
+;;; *************************************************************************************
+;;;  compensating.pattern — recovery (Reflection)
+;;;
+;;;  A plan stalled.  Three responses, in order of preference:
+;;;
+;;;    BACKTRACK  retreat to the previous sub-goal and try again from there
+;;;    DETOUR     find a different Action that reaches the same telon
+;;;    BYPASS     skip this sub-goal and press on — last resort
+;;;
+;;;  Piaget's reversibility, mechanised.  Without this a failed precondition
+;;;  simply blocks, and the mind re-proposes the same doomed act forever.
+;;; *************************************************************************************
+
+(extend Reflection
+
+  (rule Compensator-Detour
+    memo "A stalled telon with an alternative Action takes the alternative."
+    domain Wisdom
+    salience 10000
+    with [Agenda ^ as ?agendum :Telon as ?telon :Plan = fail]
+         [Action :M as ?alt :Context as ?ctx]
+         [Scheme :M = ?alt :E as ?res]
+         (in ?telon ?res)
+         (every ?p in ?ctx (is-active ?p Observed))
+         (notany [Trial :Action = ?alt :Doing = idle])
+    do
+      (var ?t (schema Trial { :Action ?alt :Basis Compensator :Dream nil
+                              :Doing idle :Moment (moment) }))
+      (enable :reifiers {?t} :moment (moment) :reality Desired)
+      (put ?agendum :Plan todo))
+
+  (rule Compensator-Backtrack
+    memo "A stalled sub-goal reopens its parent so the plan can re-form."
+    domain Wisdom
+    salience 9900
+    with [Agenda ^ as ?agendum :Telon as ?telon :Plan = fail :Priority as ?pri]
+         (> ?pri 0)
+         [Agenda ^ as ?parent :Priority as ?ppri :Plan = busy]
+         (= ?ppri (- ?pri 1))
+    do
+      (put ?parent :Plan todo)
+      (free ?agendum))
+
+  (rule Compensator-Bypass
+    memo "A stalled sub-goal with no alternative and no parent is abandoned."
+    domain Wisdom
+    salience 9500
+    with [Agenda ^ as ?agendum :Telon as ?telon :Plan = fail]
+         (notany [Scheme :M as ?a :R = (R Action) :E as ?res] (in ?telon ?res))
+    do
+      ;; nothing reaches it: record the lesson and let it go, so
+      ;; attention returns to what is achievable
+      (schema Lesson { :Problem ?telon :Maxim (antith ?telon) :Moment (moment) })
+      (free ?agendum))
+
+  (agent Compensator
+    (function {}
+      (with [Agenda :Telon as ?telon :Plan = fail]
+        do (compensate ?telon)))
+    "locus://sol.earth.orb.local.host/mind/compensator"
+    (function {?sender ?msg} told)
+    \@m{40})
+
+  (function compensate {variant ?telon}
+    (var ?found no)
+    (with [Action :M as ?alt :Context as ?ctx]
+          [Scheme :M = ?alt :E as ?res]
+          (in ?telon ?res)
+      do (when (every ?p in ?ctx (is-active ?p Observed))
+           (do (set ?found yes)
+               (enable :reifiers
+                 {(schema Trial { :Action ?alt :Basis Compensator :Dream nil
+                                  :Doing idle :Moment (moment) })}
+                 :moment (moment) :reality Desired))))
+    (unless ?found
+      (with [Agenda ^ as ?ag :Telon = ?telon] do (free ?ag))))
+
+) ;; end extend Reflection
+
+;;; ---------------  end of file -----------------
