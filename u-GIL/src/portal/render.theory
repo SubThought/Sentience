@@ -1,0 +1,121 @@
+;;; *************************************************************************************
+;;;  render.theory — the audit surface
+;;;
+;;;  THE POINT: the portal renders the SAME rows the mind acted on.  The
+;;;  Deliberation record is the decision function's working memory,
+;;;  persisted — not a post-hoc explanation generated alongside the answer.
+;;;
+;;;  Three windows:
+;;;    perception.html    every observation, its stages, its match score
+;;;    deliberation.html  every proposal, its proposer, its standing, its fate
+;;;    space.html         the seven-level hierarchy as the mind has built it
+;;; *************************************************************************************
+
+(theory Portal {2 0 0}
+
+  "Portal — perception, deliberation and space, audited."
+
+  (function portal-css {}
+    (do "
+<style>
+ body{background:#F5F2EA;color:#1C1B18;font:14px/1.6 ui-monospace,Menlo,monospace;margin:28px}
+ h1{color:#0B5D52;font-weight:600;font-size:20px}
+ h2{color:#1B5C9E;margin-top:26px;font-size:15px}
+ .card{border:1px solid #DCD5C6;border-radius:8px;padding:12px 16px;margin:10px 0;background:#FFF}
+ .new{border-left:none;background:#F3F8F4}
+ .tag{display:inline-block;background:#EDE8DC;border-radius:4px;padding:1px 7px;margin:2px;font-size:12px}
+ .chosen{background:#E4F0E9;font-weight:700}
+ .rejected{color:#78746C}
+ .score{color:#8C6000}
+ .lvl{display:inline-block;background:#FFF;border:1px solid #DCD5C6;border-radius:5px;
+      padding:3px 10px;margin:2px;font-size:12px}
+ .cap{color:#78746C;font-size:12px}
+</style>"))
+
+  ;; ── perception ────────────────────────────────────────────
+  ;; The match SCORE is shown, not just the verdict.  Graded
+  ;; identity is only useful if you can see the grade.
+
+  (function portal-perception {string ?path integer ?limit}
+    (var ?body "")
+    (with [Trace :Modality as ?mod :Data as ?data :Outcome as ?out
+                 :Score as ?score :Traits as ?traits :Stages as ?stages]
+          sort ?limit
+      do
+      (var ?h ($$ "<div class='card " (string ?out) "'><b>" (string ?mod)
+                  " / " (string ?data) "</b> <span class='score'>"
+                  (string ?out) " @ " (string ?score) "</span><br>"))
+      (for ?t in ?traits
+        (set ?h ($$ ?h "<span class='tag'>" (string ?t) "</span>")))
+      (set ?h ($$ ?h "<div class='cap'>"))
+      (for ?s in ?stages
+        (set ?h ($$ ?h (string (:Stage ?s)) " &middot; " (string (:Note ?s)) " ")))
+      (set ?body ($$ ?body ?h "</div></div>")))
+    (write ?path ($$ "<!doctype html><html><head><meta charset='utf-8'>"
+                     "<title>u-GIL — Perception</title>" (portal-css)
+                     "</head><body><h1>Perception</h1>"
+                     "<div class='cap'>every moment of seeing, and what the mind did with it</div>"
+                     ?body "</body></html>"))
+    ?path)
+
+  ;; ── deliberation ──────────────────────────────────────────
+  ;; Every proposal, who made it, how much activation it carried,
+  ;; and whether it won.  Rejected proposals are receipts too.
+
+  (function portal-deliberation {string ?path}
+    (var ?body "")
+    (var ?n 0)
+    (with [Deliberation :M as ?d :Telon as ?telon :Candidates as ?cands
+                        :Chosen as ?chosen :Outcome as ?out]
+      do
+      (set ?n (+ ?n 1))
+      (var ?h ($$ "<div class='card'><b>decision " (string ?n)
+                  "</b> <span class='cap'>telon " (string ?telon)
+                  " &middot; " (string (default ?out "pending")) "</span><br>"))
+      (for ?c in ?cands
+        (set ?h ($$ ?h "<span class='tag "
+                    (if (= (:Verdict ?c) chosen) "chosen" else "rejected")
+                    "'>" (string (:Act ?c)) " &larr; " (string (:Basis ?c))
+                    " <span class='score'>" (string (:Pulses ?c))
+                    " pulses</span></span>")))
+      (set ?body ($$ ?body ?h "</div>")))
+    (when (= ?n 0)
+      (set ?body "<div class='cap'>no decisions yet</div>"))
+    (write ?path ($$ "<!doctype html><html><head><meta charset='utf-8'>"
+                     "<title>u-GIL — Deliberation</title>" (portal-css)
+                     "</head><body><h1>Deliberation</h1>"
+                     "<div class='cap'>Selection is activation strength in Desired. "
+                     "Convergent proposals accumulate on the same act; the most "
+                     "activated wins; ties break on the proposer's rank. Every "
+                     "proposal is shown, including the ones that lost.</div>"
+                     ?body "</body></html>"))
+    ?path)
+
+  ;; ── space ─────────────────────────────────────────────────
+  ;; The seven levels as the mind has actually built them.  In a
+  ;; fresh mind this page is nearly empty; that is the point.
+
+  (function portal-space {string ?path}
+    (var ?body "")
+    (for ?lv in {Map Region Area Place Locale Venue Scene}
+      (var ?count 0)
+      (with [Scheme :M as ?m :R = (R ?lv)] do (set ?count (+ ?count 1)))
+      (set ?body ($$ ?body "<div class='card'><b>" (string ?lv)
+                     "</b> <span class='score'>" (string ?count)
+                     "</span> <span class='cap'>known</span><br>"))
+      (with [Scheme :M as ?m :R = (R ?lv)]
+            limit 24
+        do (set ?body ($$ ?body "<span class='lvl'>" (string ?m) "</span>")))
+      (set ?body ($$ ?body "</div>")))
+    (write ?path ($$ "<!doctype html><html><head><meta charset='utf-8'>"
+                     "<title>u-GIL — Space</title>" (portal-css)
+                     "</head><body><h1>The spatial hierarchy</h1>"
+                     "<div class='cap'>Seven levels, Scene through Map. The grammar "
+                     "is given; everything in it was learned. The same page renders "
+                     "for the Eidos and for the Expanse.</div>"
+                     ?body "</body></html>"))
+    ?path)
+
+) ;; end theory Portal
+
+;;; ---------------  end of file -----------------
