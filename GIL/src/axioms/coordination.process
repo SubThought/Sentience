@@ -1,0 +1,729 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;; coordination.process { 10 0 0 }
+;;;
+;;;
+;;; Changes from _010:
+;;;   - Deleted George agent stub — replaced by George-Symbolism,
+;;;     George-Metaphor, George-Analogy rules in §10
+;;;   - Deleted Conceiver agent stub — replaced by Conceiver-Conceptualize
+;;;     rule in §10 (remaining triggers tabled until Solving/Reasoning)
+;;;   - Deleted 7 Chunker agent stubs (CatChunker, ClassChunker, ConChunker,
+;;;     FeaChunker, IdeaChunker, MetaChunker, UniChunker) — replaced by
+;;;     14 rules in §11 (7 × Crunch + 7 × Combine)
+;;;   - §0: added crunch and combine support functions
+;;;   - §0: added shared-elements support function
+;;;   - §10: George-Symbolism, George-Metaphor, George-Analogy
+;;;   - §10: Conceiver-Conceptualize
+;;;   - §11 NEW: 14 Chunking rules — Category/Class/Concept/Feature/
+;;;     Idea/Metaphor/Unison × Crunch/Combine
+;;;   - Updated coordinate launch list
+;;;
+;;; Changes from _009:
+;;;   - All (enum Relationships ...) migrated to (R ...) throughout (~132 sites)
+;;;   - Deleted Simon agent — replaced by Simon-Pair, Simon-Group rules
+;;;   - Deleted Classifier agent stub — replaced by 5 Classifier rules
+;;;   - Deleted Theon agent — replaced by Theon-Causes, Theon-Implies,
+;;;     Theon-Theorize rules
+;;;   - Deleted Toth agent — replaced by Toth-Theme, Toth-Lesson,
+;;;     Toth-Maxim rules
+;;;   - Removed Simon, Classifier, Theon, Toth from coordinate launch list
+;;;   - §10: 14 new Association rules:
+;;;       Simon-Pair, Simon-Group
+;;;       Classifier-Classify, Classifier-Kinds, Classifier-Categories,
+;;;       Classifier-Traits, Classifier-Members
+;;;       Theon-Causes, Theon-Implies, Theon-Theorize
+;;;       Toth-Theme, Toth-Lesson, Toth-Maxim
+;;;
+;;; Changes from _008:
+;;;   - Simon: implemented — pairwise Idea Category comparison,
+;;;     Genus hierarchy construction, ImmediatePotentiation
+;;;   - Deleted Prototyper/Framer/Exempler agent stubs (replaced by rules)
+;;;   - Removed Prototyper/Framer/Exempler from coordinate launch list
+;;;   - §10: Prototyper rule — active Episode → walk Events → extract
+;;;     Categories from Slots → create bare prototype schemes → group
+;;;     under Scenario with Episode in :E
+;;;   - §10: Framer rule — active Scenario → collect unique :R → :Roles,
+;;;     unique :A∪:E → :Categories → create Frame
+;;;   - §10: Exempler-Direct rule — active Genus + Idea argument + no
+;;;     Member → create Member
+;;;   - §10: Exempler-Transitive rule — active Genus + child Genus's
+;;;     Member + no Member at this level → create transitive Member
+;;;
+;;; Changes from _007:
+;;;   - URLs migrated to locus:// scheme throughout
+;;;   - SEQ merge: proper temporal ordering via seq-ordered helper
+;;;   - Entifier: fixed to query Unisons + Percepts (not Percepts only)
+;;;   - Plexer: fixed to query co-active Entities (not all reifiers)
+;;;   - Ideator: fixed to query co-active Slots (not Series)
+;;;   - Deleted tier-polymorphic agents: Tandy, Seriator, Categorizer,
+;;;     Chooser, Attributer, Eventer, Locater, Mapper
+;;;   - §10: 20 Association rules replacing deleted agents:
+;;;       Tandy-Percept, Tandy-Idea, Tandy-Event
+;;;       Seriator-Tandem, Seriator-Category, Seriator-Event
+;;;       Categorizer-Entity, Categorizer-Phoneme
+;;;       Chooser-Phoneme, Chooser-Action
+;;;       Attributer-Object, Attributer-Word
+;;;       Eventer
+;;;       Locate-Recognize, Locate-Accumulate, Locate-Split, Locate-NewVenue
+;;;       Map-Bootstrap, Map-Assign, Map-Split
+;;;
+;;; Changes from _006:
+;;;   - §0: added coherence-for function (local Thagard coherence)
+;;;   - §0: added generic co-active potentiation query function
+;;;   - §0: added coincident-percepts, image-schemas-from,
+;;;     find-similar-tier, find-attribute-slots,
+;;;     find-multi-transition-tandems, active-schemes
+;;;   - §0: added SchemaCandidate and MultiTransition structures
+;;;   - §1: Cronos reads ActivationWindow from daicho via (setting ...)
+;;;   - §3: all potentiation agents read window from Registry.daicho
+;;;   - §3: Assembler, Entifier, Tandy, Seriator, Categorizer, Ideator
+;;;     refactored to use generic co-active + Registry read
+;;;   - §3: Grounder fixed — connects Unison assembly to Percept
+;;;     (not individual features)
+;;;   - §3: Skemer (coord) refactored — co-active shapes + objects
+;;;   - §3: Plexer, Attributer fixed :Reifier → :M
+;;;   - §3: Chooser, Locater refactored to use helper functions
+;;;   - §3: Theon implemented — hypothesis + theory formation
+;;;   - §3: Toth implemented — theme + maxim formation
+;;;
+;;; Changes from _005:
+;;;   - §0 added: support functions (coalesce, propagate-upward,
+;;;     propagate-downward, propagate-radial, dyad-emotion, is-active,
+;;;     count-active, arousal-for, valence-for, attract-for, power-for,
+;;;     arrange)
+;;;   - §1 Cronos: full expiry logic using ActivationWindow from Registry;
+;;;     handles both enabled and impeded expiration
+;;;   - §1 all agents: :Reifier → :M to match Activation relation
+;;;   - §2 Gluer: simplified to (new Glue :M ?m), defaults to 0 0 0
+;;;   - §2 Arranger: full force calculation (attract, repel, vertical, gravity)
+;;;     with parameters from Coordination.daicho
+;;;   - §2 Arouser: urgency-based arousal with dyad negation
+;;;   - §2 Affecter: outcome-based valence with dyad negation
+;;;   - §2 Attractor: NEW — approach/aversion with dyad negation
+;;;   - §2 Dominator: NEW — power/dominance with dyad negation
+;;;   - §2 Estimator: :Reifier → :M
+;;;   - §2 Coherer: :Reifier → :M (logic deferred)
+;;;   - coordinate function: added Attractor, Dominator
+;;;
+;;; Patterns:   Activation · Propagation · Association ·
+;;;             Chunking · Solving · Reasoning ·
+;;;             Reaction · Deliberation · Thinking
+;;;
+;;; Mechanisms (reactive services):
+;;;   Activator · Eventer
+;;;
+;;; Mechanisms (proactive agents):
+;;;   Observer (\@m1) · Anticipator (\@m1) · Reminder (\@m5) ·
+;;;   Dreamer (\@m10) · Arouser (\@m10) · Affecter (\@m10) ·
+;;;   Attractor (\@m10) · Dominator (\@m10) ·
+;;;   Gluer (\@m5) · Arranger (\@m20) · Cronos (\@m50) ·
+;;;   Coherer (\@m50) · Estimator (\@m50) ·
+;;;   Assembler (\@m32) · Grounder (\@m32) · Skemer (\@m32) ·
+;;;   Entifier (\@m2000) ·
+;;;   Plexer (\@m120000) · Ideator (\@m120000) ·
+;;;   Decentrator (\@m120000) ·
+;;;   Anas (\@m10) · Kace (\@m10) · Hier (\@m10) · Mends (\@m10) ·
+;;;   Plato (\@m10) · Stacy (\@m10) · Gray (\@m10) · Les (\@m10) ·
+;;;   Epis (\@m10) · Gene (\@m10) ·
+;;;   Reactor (\@m1) · Deliberator (\@m10) ·
+;;;   Deducer (\@m10) · Analogizer (\@m10) · Inducter (\@m10) ·
+;;;   Transducter (\@m10) · Infralogizer (\@m10) ·
+;;;   Jean (\@m10) · Alternizer (\@m10) ·
+;;;   Backcaster (\@m10) · Experimenter (\@m10) · Explainer (\@m10) ·
+;;;   Hindcaster (\@m10) · Prefacter (\@m10) · Projecter (\@m10) ·
+;;;   Prover (\@m10) · Recaller (\@m10) · Refuter (\@m10) ·
+;;;   Semifacter (\@m10) · Supposer (\@m10)
+;;;
+;;; Timing:
+;;;   \@m1  = 1 Moment  ≈ 0.0315576 s  (nano-year; 16-digit integer clock)
+;;;   \@j1  = 1 Jiffy   = 1 millisecond
+;;;
+
+
+(theory Coordination
+
+  (require  Coordination  from  "../pattern/activating.pattern"    or abort)
+  (require  Coordination  from  "../pattern/propagating.pattern"   or abort)
+  (require  Coordination  from  "../pattern/associating.pattern"   or abort)
+  (require  Coordination  from  "../pattern/chunking.pattern"      or abort)
+  (require  Coordination  from  "../pattern/structuring.pattern"   or abort)
+  (require  Coordination  from  "../pattern/theorizing.pattern"    or abort)
+  (require  Coordination  from  "../pattern/narrating.pattern"     or abort)
+  (require  Coordination  from  "../pattern/gaming.pattern"        or abort)  
+  (require  Coordination  from  "../pattern/reacting.pattern"      or abort)
+  (require  Coordination  from  "../pattern/deliberating.pattern"  or abort)
+  (require  Coordination  from  "../pattern/solving.pattern"       or abort)
+  (require  Coordination  from  "../pattern/reasoning.pattern"     or abort)
+  (require  Coordination  from  "../pattern/thinking.pattern"      or abort)
+  (require  Coordination  from  "../pattern/uttering.pattern"      or abort)
+  (require  Coordination  from  "../pattern/imagining.pattern"     or abort)
+  (require  Coordination  from  "../pattern/staging.pattern"       or abort)
+  (require  Coordination  from  "../pattern/navigating.pattern"    or abort)
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §0  COORDINATION SUPPORT FUNCTIONS
+  ;
+  ; Shared functions used by Activating and Propagating agents.
+  ; ─────────────────────────────────────────────────────────────
+
+
+  ; is-active — true if a reifier has positive Pulses in a reality.
+
+  (function is-active {long ?reifier literal ?reality}
+    (var ?result no)
+    (with [Activation :M = ?reifier :Reality = ?reality :Pulses as ?p]
+          (> ?p 0)
+      do (set ?result yes))
+    ?result)
+
+
+  ; count-active — count how many reifiers in a list are active.
+
+  (function count-active {list ?reifiers literal ?reality}
+    (var ?count 0)
+    (for ?r in ?reifiers
+      (when (is-active ?r ?reality)
+        (set ?count (+ ?count 1))))
+    ?count)
+
+
+  ; seq-ordered — true if all reifiers in the list are active and
+  ; were enabled in sequential order (argument N enabled before N+1).
+
+  (function seq-ordered {list ?reifiers literal ?reality}
+    (when (< (length ?reifiers) 2) (return yes))
+    (when (/= (count-active ?reifiers ?reality) (length ?reifiers))
+      (return no))
+    (var ?ordered yes)
+    (step ?i from 1 to (- (length ?reifiers) 1)
+      (var ?prev (nth ?reifiers ?i))
+      (var ?next (nth ?reifiers (+ ?i 1)))
+      (var ?t-prev 0)
+      (var ?t-next 0)
+      (with [Activation :M = ?prev :Reality = ?reality :EnabledSince as ?t]
+        do (set ?t-prev ?t))
+      (with [Activation :M = ?next :Reality = ?reality :EnabledSince as ?t]
+        do (set ?t-next ?t))
+      (when (>= ?t-prev ?t-next)
+        (set ?ordered no)))
+    ?ordered)
+
+
+  ; coalesce — evaluate a scheme's merge rule against its active
+  ; arguments.  If the quorum is met, enable the scheme's reifier
+  ; and disperse activation to its referents.
+
+  (function coalesce {long ?scheme literal ?reality moment ?now}
+    (with [Scheme :M = ?scheme :R as ?rel :A as ?args :E as ?refs]
+      do
+      ; look up merge type for this relation
+      (var ?merge PASS)
+      (with [Merging :R = ?rel :Merge as ?m]
+        do (set ?merge ?m))
+      (var ?total  (length ?args))
+      (var ?active (count-active ?args ?reality))
+      ; apply merge rule
+      (var ?fires
+        (case ?merge
+          of ONE   (= ?active 1)
+          of PASS  (> ?active 0)
+          of NOT   (= ?active 0)
+          of AND   (= ?active ?total)
+          of SEQ   (seq-ordered ?args ?reality)  ; temporal ordering via :EnabledSince
+          of OR    (> ?active 0)
+          of NOR   (= ?active 0)
+          of VOTE  (> ?active (/ ?total 2))
+          else     (> ?active 0)))
+      ; if fires, enable scheme and disperse to referents
+      (when ?fires
+        (enable :reifiers {?scheme} :moment ?now :reality ?reality)
+        (when (> (length ?refs) 0)
+          (enable :reifiers ?refs :moment ?now :reality ?reality)))))
+
+
+  ; propagate-upward — bottom-up flow within a reality.
+  ; For each scheme containing this reifier as an argument,
+  ; evaluate its merge rule and potentially fire.
+  ; The Observer (Observed) and Dreamer (Imagined) call this.
+
+  (function propagate-upward {long ?reifier moment ?now literal ?reality}
+    (with [Argument :A = ?reifier :M as ?parent]
+      do (coalesce ?parent ?reality ?now)))
+
+
+  ; propagate-downward — top-down flow within a reality.
+  ; For each scheme containing this reifier as a referent,
+  ; enable the scheme and its arguments.
+  ; The Anticipator (Expected) calls this.
+
+  (function propagate-downward {long ?reifier moment ?now literal ?reality}
+    (with [Referent :E = ?reifier :M as ?parent]
+      do
+      (enable :reifiers {?parent} :moment ?now :reality ?reality)
+      (with [Scheme :M = ?parent :A as ?args]
+        do (when (> (length ?args) 0)
+             (enable :reifiers ?args :moment ?now :reality ?reality)))))
+
+
+  ; propagate-radial — radial flow within a reality.
+  ; Enable nearby schemes by Glue proximity, attenuated by distance.
+  ; The Reminder (Recalled) calls this.
+
+  (function propagate-radial {long ?reifier moment ?now literal ?reality
+                              + real ?radius = 5.0}
+    (var ?decay (setting Registry RadialPropagation :DecayFunction))
+    (with [Glue :M = ?reifier :X as ?x :Y as ?y :Z as ?z]
+      do
+      (with [Glue :M as ?neighbor :X as ?nx :Y as ?ny :Z as ?nz]
+            (!= ?neighbor ?reifier)
+        do
+        (var ?dist (sqrt (+ (* (- ?nx ?x) (- ?nx ?x))
+                            (* (- ?ny ?y) (- ?ny ?y))
+                            (* (- ?nz ?z) (- ?nz ?z)))))
+        (when (and (< ?dist ?radius) (> ?dist 0))
+          ; attenuate pulses by distance
+          (var ?strength
+            (case ?decay
+              of inverse-square  (/ 1.0 (* ?dist ?dist))
+              of exponential     (** 0.5 ?dist)
+              of linear          (/ (- ?radius ?dist) ?radius)
+              else               (/ 1.0 (* ?dist ?dist))))
+          (var ?pulses (max 1 (truncate (* ?strength 10))))
+          (enable :reifiers {?neighbor} :moment ?now :reality ?reality)))))
+
+
+  ; dyad-emotion — write an emotion dimension value to a reifier.
+  ; If the dyad (negated reifier) has a scheme, write the
+  ; negated value to its Emotion record.
+
+  (function dyad-emotion {long ?reifier literal ?slot real ?value}
+    (var ?emo (knew Emotion :M ?reifier))
+    (put ?emo ?slot ?value)
+    (var ?neg (- 0 ?reifier))
+    (with [Scheme :M = ?neg]
+      do
+      (var ?dyadEmo (knew Emotion :M ?neg))
+      (put ?dyadEmo ?slot (- 0 ?value))))
+
+
+  ; arousal-for — compute arousal based on urgency.
+  ; Sources: active in Desired reality, homeostatic Need delta.
+
+  (function arousal-for {long ?reifier}
+    (var ?arousal 0.0)
+    (with [Activation :M = ?reifier :Reality = Desired :Pulses as ?p]
+          (> ?p 0)
+      do (set ?arousal (max ?arousal 0.5)))
+    (with [Need :M = ?reifier :Delta as ?d]
+      do (set ?arousal (max ?arousal (min 1.0 (abs ?d)))))
+    (min 1.0 (max -1.0 ?arousal)))
+
+
+  ; valence-for — compute valence from long-term action outcomes
+  ; and short-term homeostatic need satisfaction.
+
+  (function valence-for {long ?reifier}
+    (var ?valence 0.0)
+    (var ?totalReward 0.0)
+    (var ?rewardCount 0)
+    (with [Reward :Action = ?reifier :Value as ?v]
+      do
+      (set ?totalReward (+ ?totalReward ?v))
+      (set ?rewardCount (+ ?rewardCount 1)))
+    (when (> ?rewardCount 0)
+      (set ?valence (/ ?totalReward ?rewardCount)))
+    (with [Need :M = ?reifier :Delta as ?d]
+      do (set ?valence (- ?valence (* 0.5 ?d))))
+    (min 1.0 (max -1.0 ?valence)))
+
+
+  ; attract-for — compute approach/aversion.
+  ; Objectives and needs attract; obstacles repel.
+
+  (function attract-for {long ?reifier}
+    (var ?approach 0.0)
+    (with [Activation :M = ?reifier :Reality = Desired :Pulses as ?p]
+          (> ?p 0)
+      do (set ?approach 0.5))
+    (with [Scheme :M = ?reifier :R as ?rel]
+          (= ?rel (R Obstacle))
+      do (set ?approach -0.5))
+    (min 1.0 (max -1.0 ?approach)))
+
+
+  ; power-for — compute power/dominance.
+  ; High action success rate = control; obstacles = helplessness.
+
+  (function power-for {long ?reifier}
+    (var ?power 0.0)
+    (with [Utility :M = ?reifier :Attempts as ?att :Successes as ?suc]
+          (> ?att 0)
+      do (set ?power (- (* 2.0 (/ ?suc ?att)) 1.0)))
+    (with [Scheme :M = ?reifier :R as ?rel]
+          (= ?rel (R Obstacle))
+      do (set ?power (min ?power -0.3)))
+    (min 1.0 (max -1.0 ?power)))
+
+
+  ; arrange — compute forces and update a single Glue record.
+  ; Called by the Arranger agent for each scheme.
+
+  (function arrange {long ?reifier
+                     real ?attractForce  real ?repelDist  real ?repelForce
+                     real ?vertGap       real ?gravity    real ?coolRate}
+    (with [Glue :M = ?reifier :X as ?x :Y as ?y :Z as ?z
+                :Disp as ?disp :Temp as ?temp as ?g]
+      do
+      (var ?dx 0.0)
+      (var ?dy 0.0)
+      (var ?dz 0.0)
+
+      ; Force 1: attract arguments toward reifier on X,Y plane
+      (with [Argument :M = ?reifier :A as ?arg]
+            [Glue :M = ?arg :X as ?ax :Y as ?ay]
+        do
+        (set ?dx (+ ?dx (* ?attractForce (- ?ax ?x))))
+        (set ?dy (+ ?dy (* ?attractForce (- ?ay ?y)))))
+
+      ; Force 2: repel from nearby schemes
+      (with [Glue :M as ?other :X as ?ox :Y as ?oy :Z as ?oz]
+            (!= ?other ?reifier)
+        do
+        (var ?dist (sqrt (+ (* (- ?ox ?x) (- ?ox ?x))
+                            (* (- ?oy ?y) (- ?oy ?y))
+                            (* (- ?oz ?z) (- ?oz ?z)))))
+        (when (< ?dist ?repelDist)
+          (var ?f (/ ?repelForce (max ?dist 0.01)))
+          (set ?dx (- ?dx (* ?f (/ (- ?ox ?x) (max ?dist 0.01)))))
+          (set ?dy (- ?dy (* ?f (/ (- ?oy ?y) (max ?dist 0.01)))))
+          (set ?dz (- ?dz (* ?f (/ (- ?oz ?z) (max ?dist 0.01)))))))
+
+      ; Force 3: keep reifier above its arguments on Z
+      (with [Argument :M = ?reifier :A as ?arg]
+            [Glue :M = ?arg :Z as ?az]
+            (>= ?az ?z)
+        do (set ?dz (+ ?dz ?vertGap)))
+
+      ; Force 3b: keep referents above reifier on Z
+      (with [Referent :M = ?reifier :E as ?ref]
+            [Glue :M = ?ref :Z as ?rz]
+            (<= ?rz ?z)
+        do (set ?dz (- ?dz ?vertGap)))
+
+      ; Force 4: gravity — schemes with no arguments sink to bottom
+      (when (= 0 (tally [Argument :M = ?reifier])
+        (set ?dz (- ?dz ?gravity)))
+
+      ; Apply displacement with temperature-scaled movement
+      (var ?scale (* ?disp (+ 1.0 ?temp)))
+      (put ?g
+        :X    (+ ?x (* ?dx ?scale))
+        :Y    (+ ?y (* ?dy ?scale))
+        :Z    (+ ?z (* ?dz ?scale))
+        :Temp (* ?temp ?coolRate))))
+
+
+  ; coherence-for — compute local coherence per Thagard (1998).
+  ; Sorts a scheme's arguments and referents into accepted (active)
+  ; and rejected (inactive) lists.  Score = (accepted - rejected) / total.
+  ; Disconnected schemes (no arguments or referents) return 0.
+
+  (function coherence-for {long ?reifier}
+    (var ?accepted 0)
+    (var ?rejected 0)
+    (with [Scheme :M = ?reifier :A as ?args :E as ?refs]
+      do
+      (for ?a in ?args
+        (if (is-active ?a Observed)
+            (set ?accepted (+ ?accepted 1))
+            (set ?rejected (+ ?rejected 1))))
+      (for ?e in ?refs
+        (if (is-active ?e Observed)
+            (set ?accepted (+ ?accepted 1))
+            (set ?rejected (+ ?rejected 1)))))
+    (var ?total (+ ?accepted ?rejected))
+    (if (= ?total 0)
+        0.0
+        (/ (- ?accepted ?rejected) ?total)))
+
+
+  ; co-active — generic potentiation query.
+  ; Returns reifiers of schemes with relation ?relation that were
+  ; active within ?window moments of now, using EnabledUntil timestamps.
+
+  (function co-active {moment ?window long ?relation}
+    (var ?cutoff (- (moment) ?window))
+    (with [Activation :M as ?r :EnabledUntil as ?eu]
+          (> ?eu ?cutoff)
+          [Scheme :M = ?r :R = ?relation]
+      list ?r))
+
+
+  ; coincident-percepts — find Percept-relation schemes co-active
+  ; with a given feature within a potentiation window.
+
+  (function coincident-percepts {long ?feature moment ?window}
+    (var ?cutoff (- (moment) ?window))
+    (var ?featureEU 0)
+    (with [Activation :M = ?feature :EnabledUntil as ?eu]
+      do (set ?featureEU ?eu))
+    (with [Activation :M as ?r :EnabledUntil as ?eu]
+          (> ?eu ?cutoff)
+          (> ?eu (- ?featureEU ?window))
+          [Scheme :M = ?r :R = (R Percept)]
+      list ?r))
+
+
+  ; image-schemas-from — detect spatial relationships between
+  ; co-active shapes/objects using Glue coordinates.
+  ; Returns a list of SchemaCandidate ephemerons with :type :left :right.
+
+  (structure SchemaCandidate :type :left :right)
+
+  (function image-schemas-from {list ?shapes}
+    (var ?schemas {})
+    (for ?a in ?shapes
+      (for ?b in ?shapes
+        (when (< ?a ?b)
+          (with [Glue :M = ?a :X as ?ax :Y as ?ay :Z as ?az]
+                [Glue :M = ?b :X as ?bx :Y as ?by :Z as ?bz]
+            do
+            ; vertical alignment → Above
+            (when (and (< (abs (- ?ax ?bx)) 1.0)
+                       (> (abs (- ?az ?bz)) 0.5))
+              (var ?under (if (< ?az ?bz) ?a ?b))
+              (var ?over  (if (< ?az ?bz) ?b ?a))
+              (set ?schemas (append ?schemas
+                {(new SchemaCandidate :type Above :left {?under} :right {?over})})))
+            ; horizontal alignment → Beside
+            (when (and (< (abs (- ?az ?bz)) 0.5)
+                       (> (abs (- ?ax ?bx)) 0.5))
+              (var ?leftS  (if (< ?ax ?bx) ?a ?b))
+              (var ?rightS (if (< ?ax ?bx) ?b ?a))
+              (set ?schemas (append ?schemas
+                {(new SchemaCandidate :type Beside :left {?leftS} :right {?rightS})})))
+            ; proximity → Together
+            (var ?dist (sqrt (+ (* (- ?ax ?bx) (- ?ax ?bx))
+                                (* (- ?ay ?by) (- ?ay ?by))
+                                (* (- ?az ?bz) (- ?az ?bz)))))
+            (when (< ?dist 2.0)
+              (set ?schemas (append ?schemas
+                {(new SchemaCandidate :type Together :left {?a ?b} :right {})})))
+            ; containment → Container
+            (when (and (< (abs (- ?ax ?bx)) 0.5)
+                       (< (abs (- ?ay ?by)) 0.5)
+                       (< (abs (- ?az ?bz)) 0.5))
+              (set ?schemas (append ?schemas
+                {(new SchemaCandidate :type Container :left {?a} :right {?b})})))))))
+    ?schemas)
+
+
+  ; find-similar-tier — find schemes at adjacent tiers that are
+  ; co-active within a potentiation window.
+
+  (function find-similar-tier {long ?reifier moment ?window}
+    (var ?cutoff (- (moment) ?window))
+    (with [Glue :M = ?reifier :Z as ?z]
+      do
+      (with [Activation :M as ?r :EnabledUntil as ?eu]
+            (> ?eu ?cutoff)
+            (!= ?r ?reifier)
+            [Glue :M = ?r :Z as ?rz]
+            (< (abs (- ?rz ?z)) 2.0)
+        list ?r)))
+
+
+  ; find-attribute-slots — find co-active scheme pairs suitable
+  ; for Slot (attribute→value) binding within a potentiation window.
+  ; Returns pairs {entity attr} from co-active Idea/Entity reifiers.
+
+  (function find-attribute-slots {long ?reifier moment ?window}
+    (var ?cutoff (- (moment) ?window))
+    (var ?pairs {})
+    (with [Activation :M as ?r :EnabledUntil as ?eu]
+          (> ?eu ?cutoff)
+          (!= ?r ?reifier)
+          [Scheme :M = ?r :R as ?rel]
+          (in ?rel {(R Feature)
+                    (R Idea)})
+      do (set ?pairs (append ?pairs {{?reifier ?r}})))
+    ?pairs)
+
+
+  ; find-multi-transition-tandems — find Tandem sources with
+  ; multiple outgoing transitions (allomorphs / ambiguity).
+  ; Returns a list of {prior branches} pairs.
+
+  (structure MultiTransition :prior :branches)
+
+  (function find-multi-transition-tandems {moment ?window}
+    (var ?cutoff (- (moment) ?window))
+    (var ?results {})
+    (var ?checked {})
+    (with [Scheme :R = (R Tandem) :A as ?args :M as ?m]
+          [Activation :M = ?m :EnabledUntil as ?eu]
+          (> ?eu ?cutoff)
+      do
+      (var ?prior (first ?args))
+      (when (not (in ?prior ?checked))
+        (set ?checked (append ?checked {?prior}))
+        (var ?branches
+          (with [Scheme :R = (R Tandem) :A as ?a2 :E as ?e2]
+                (= (first ?a2) ?prior)
+            list (first ?e2)))
+        (when (> (length ?branches) 1)
+          (set ?results (append ?results
+            {(new MultiTransition :prior ?prior :branches ?branches)})))))
+    ?results)
+
+
+  ; active-schemes — return reifiers of currently active schemes
+  ; of a given relation type in Observed reality.
+
+  (function active-schemes {literal ?relation}
+    (with [Activation :M as ?r :Pulses as ?p :Reality = Observed]
+          (> ?p 0)
+          [Scheme :M = ?r :R = (R ?relation)]
+      list ?r))
+
+
+  ; chunk-partition — partition a list into Miller's law (7±2) groups.
+  ; Returns a list of sublists, each between MinChunk and MaxChunk elements.
+  ; If the list is shorter than MaxChunk, returns it as a single group.
+  ; If the remainder after the first group is below MinChunk, it merges
+  ; into the first group (bin-pack).
+
+  (function chunk-partition {list ?items
+                             + integer ?min := 5 integer ?max := 9}
+    (var ?n (# ?items))
+    (if (<= ?n ?max)
+        {?items}
+     else
+        (var ?first-size (+ ?min (random 0 to (- ?max ?min))))
+        (var ?remainder (- ?n ?first-size))
+        (if (< ?remainder ?min)
+            {?items}
+         else
+            (& {(top ?items ?first-size)}
+               (chunk-partition (rest ?items ?first-size)
+                                ?min ?max)))))
+
+
+  ; shared-elements — return the intersection of two element lists.
+
+  (function shared-elements {list ?a list ?b}
+    (collect ?e in ?a (in ?b ?e) list ?e))
+
+
+  ; crunch — Cruncher phase 1: pairwise subsumption.
+  ; Given two schemes of the same relation type sharing elements,
+  ; create a Genus linking both and strip the shared elements from
+  ; the newer scheme (the one with the higher :M).
+  ;
+  ; ?older — reifier of the older scheme
+  ; ?newer — reifier of the newer scheme
+  ; ?shared — list of shared elements (pre-computed)
+  ; ?slot — the slot name holding the element list (e.g. :Elements, :Slots)
+
+  (function crunch {long ?older long ?newer list ?shared slot ?slot}
+    (var ?gx (schema Genus {:Mesa ?older :Meta ?newer}))
+    (enable :reifiers {?gx} :moment (moment) :reality Observed)
+    (with [Scheme :M = ?newer ?slot as ?elements]
+      do (put ?me ?slot (collect ?e in ?elements (not (in ?shared ?e)) list ?e))))
+
+
+  ; combine — Cruncher phase 2: factor shared elements into a new parent.
+  ; Given a set of schemes sharing elements, create a new parent scheme
+  ; of the same relation type holding the shared elements, link each
+  ; child via Genus, and strip the shared elements from all children.
+  ;
+  ; ?children — list of child reifiers
+  ; ?shared — list of shared elements (pre-computed)
+  ; ?relation — the relation type for the new parent
+  ; ?slot — the slot name holding the element list
+
+  (function combine {list ?children list ?shared literal ?relation slot ?slot}
+    (var ?parent (schema ?relation {?slot ?shared}))
+    (enable :reifiers {?parent} :moment (moment) :reality Observed)
+    (for ?child in ?children
+      (var ?gx (schema Genus {:Mesa ?parent :Meta ?child}))
+      (enable :reifiers {?gx} :moment (moment) :reality Observed)
+      (with [Scheme :M = ?child ?slot as ?elements]
+        do (put ?me ?slot (collect ?e in ?elements (not (in ?shared ?e)) list ?e)))))
+
+
+  ; cross-reality-active — check if a reifier is active in any of the
+  ; specified realities. Returns the first matching reality or nil.
+
+  (function cross-reality-active {long ?reifier list ?realities}
+    (with [Activation :M = ?reifier :Pulses as ?p :Reality as ?r]
+          (> ?p 0)
+          (in ?realities ?r)
+      give ?r))
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; COORDINATE — launch function
+  ; ─────────────────────────────────────────────────────────────
+
+  ; coordinate — returns the set of Coordination mechanism expressions
+  ; to be combined with Observation, Reflection, and Consolidation
+  ; expressions and run concurrently by the GIL top-level module.
+  ;
+  ; Rules (§10, §11) are driven by (think) — they do not appear here.
+
+  (function coordinate
+	(map
+        {
+          ; §1 Activating
+          Activator Cronos
+          ; §1 Activating (propagation agents)
+          Observer Anticipator Reminder Dreamer
+          ; §2 Propagating
+          Gluer Arranger Arouser Affecter
+          Attractor Dominator
+          Coherer Estimator
+          ; §3 Associating (agents retained)
+          Assembler Grounder Skemer
+          Entifier Plexer Ideator
+          Decentrator
+          ; §5 Solving
+          Anas Kace Hier Mends Plato
+          Stacy Gray Les Epis Gene
+          ; §6 Reaction — React rule (driven by think)
+          ; §7 Deliberation — Deliberate-Direct, Deliberate-Subproblem,
+          ;                   Deliberate-Problem rules (driven by think)
+          ; §8 Reasoning
+          Deducer Analogizer Inducter
+          Transducter Infralogizer Jean Alternizer
+          ; §9 Thinking
+          Backcaster Experimenter Explainer Hindcaster
+          Prefacter Projecter Prover Recaller
+          Refuter Semifacter Supposer
+        }
+        (given {?m} (call start ?m))))
+
+
+) ; end module Coordination
+
+;;; THE THEORY'S OWN CLOSER WAS COMMENTED OUT, so the form never
+;;; closed and everything after it — had there been anything — would
+;;; have fallen inside.  Restored.
+
+) ; end theory Coordination
+
+;; ---------------  end of file -----------------

@@ -1,0 +1,114 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;; observation.process  — Observation component manifest.
+;;;
+;;; Contains Case/Pipeline relations, requires three patterns,
+;;; and the observe/cease launchers.
+ 
+
+(theory Observation {1 0 0}
+
+  "Observation component — Mind/Body, Observation, Reminding patterns."
+
+  (require  Observation  from  "../pattern/observing.pattern"   or abort)
+  (require  Observation  from  "../pattern/embodying.pattern"   or abort)
+  (require  Observation  from  "../pattern/reminding.pattern"   or abort)
+
+
+
+  (function observe {}
+    "Start all observation mechanisms."
+    (trace "[Observation] Starting all agents...")
+
+    (set ?*PERCEIVER*    (start Perceiver))
+    (set ?*ASSIMILATOR*  (start Assimilator))
+    (set ?*ACCOMMODATOR* (start Accommodator))
+    (set ?*ACTUALEXER*   (start ActuaLexer))
+    (set ?*VIRTUALEXER*  (start VirtuaLexer))
+    (set ?*ICONIFIER*    (start Iconifier))
+    (set ?*GEONIFIER*    (start Geonifier))
+    (set ?*SEEN*         (start Seen))
+    (set ?*SHAPER*       (start Shaper))
+    (set ?*OBJECTIFIER*  (start Objectifier))
+    (set ?*IMAGER*       (start Imager))
+    (set ?*ACTIVATOR*    (start Activator))
+    (set ?*FACETER*      (start Faceter))
+    (set ?*STORER*       (start Storer))
+    (set ?*RETRIEVER*    (start Retriever))
+    (set ?*MATCHER*      (start Matcher))
+
+    ;;; THE TWO THAT MEET A PSYCHE.  Without the Registrar no device
+    ;;; can register, so every percept arrives bearing a token that
+    ;;; names no Device and is dropped at the gate.  Without the
+    ;;; Executor no attempt is ever dispatched, so the mind perceives
+    ;;; a world it can never act on.  Both were named in
+    ;;; [Observation :Roster] and started by nothing.
+    (set ?*REGISTRAR*    (start Registrar))
+    (set ?*EXECUTOR*     (start Executor))
+
+    (trace "[Observation] All agents running.")
+    observing)
+
+
+
+
+  (function cease {}
+    "Stop all observation mechanisms."
+    (trace "[Observation] Stopping all agents...")
+
+    ;;; CANCEL IS COOPERATIVE.  The task is signalled; it stops only
+    ;;; if its own job function calls cancelled-p and returns.  Every
+    ;;; agent below does — see the job-function form in
+    ;;; observing.pattern — and an agent that does not will be
+    ;;; signalled here and go on running, which looks exactly like a
+    ;;; clean stop and is not one.
+    (for ?agent in {?*PERCEIVER*    ?*ASSIMILATOR*  ?*ACCOMMODATOR*
+                    ?*ACTUALEXER*   ?*VIRTUALEXER*
+                    ?*ICONIFIER*    ?*GEONIFIER*
+                    ?*SEEN*         ?*SHAPER*
+                    ?*OBJECTIFIER*  ?*IMAGER*
+                    ?*ACTIVATOR*    ?*FACETER*
+                    ?*STORER*       ?*RETRIEVER*    ?*MATCHER*
+                    ?*REGISTRAR*    ?*EXECUTOR*}
+      (unless (null-p ?agent)
+        (cancel ?agent)
+        (free ?agent)))
+
+    (set ?*PERCEIVER*    nil)
+    (set ?*ASSIMILATOR*  nil)
+    (set ?*ACCOMMODATOR* nil)
+    (set ?*ACTUALEXER*   nil)
+    (set ?*VIRTUALEXER*  nil)
+    (set ?*ICONIFIER*    nil)
+    (set ?*GEONIFIER*    nil)
+    (set ?*SEEN*         nil)
+    (set ?*SHAPER*       nil)
+    (set ?*OBJECTIFIER*  nil)
+    (set ?*IMAGER*       nil)
+    (set ?*ACTIVATOR*    nil)
+    (set ?*FACETER*      nil)
+    (set ?*STORER*       nil)
+    (set ?*RETRIEVER*    nil)
+    (set ?*MATCHER*      nil)
+    (set ?*REGISTRAR*    nil)
+    (set ?*EXECUTOR*     nil)
+
+    (trace "[Observation] All agents stopped.")
+    ceased)
+
+
+) ;; end theory Observation
+
+;; ---------------  end of file -----------------

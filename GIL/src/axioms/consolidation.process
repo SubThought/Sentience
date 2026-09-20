@@ -1,0 +1,226 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; Changes from _004:
+;;;   - Scheme→S, :Reifier→:M, :Relation→:R, :Arguments→:A, :Referents→:E
+;;;     across Automator, Compressor, LZCompressor, SubdueCompressor
+;;;   - Trie `:Scheme` and `:Reifier` slots unchanged (Trie's own slots)
+;;;   - URLs migrated to locus:// scheme
+;;;
+;;; Separation: This module implements the Forgetting, Automaticity, and Compression
+;;; patterns.  It owns all long-cycle memory management mechanisms that keep the
+;;; Totality coherent, compact, and efficient over time.
+;;;
+;;; Consolidation is an accommodative process — it modifies existing cognitive
+;;; structures to make the Totality a more parsimonious and reliable mirror of
+;;; the world's regularities.
+;;;
+;;; Three complementary processes:
+;;;   Forgetting    — discards useless or aged schemes 
+;;;   Automaticity  — compresses reliable action sequences into composites
+;;;   Compression   — synthesizes similarities and compresses redundant structure
+;;;
+;;; Patterns:   Forgetting · Automaticity · Compression
+;;;
+;;; Mechanisms (proactive agents):
+;;;   Amneator       (\@m5000)  — forgetting
+;;;   Automator      (\@m10000) — automaticity
+;;;   Compressor     (\@m15000) — similarity-based compression
+;;;   LZCompressor   (\@m15000) — linear path compression
+;;;   SubdueCompressor (\@m15000) — subgraph compression via MDL
+;;;
+;;; Opportunistic rules:
+;;;   MarkVoid   — marks dormant schemes as forgettable
+;;;   RetireVoid — retires void Action schemes
+;;;
+;;; Timing:
+;;;   \@m1     = 1 Moment  ≈ 0.0315576 s  (nano-year)
+;;;   \@m5000  ≈  2.6 min  (Amneator cycle)
+;;;   \@m10000 ≈  5.3 min  (Automator cycle)
+;;;   \@m15000 ≈  7.9 min  (Compressor cycles)
+;;;
+;;; consolidation.process { 10 0 0 }
+;;;
+
+(theory Consolidation
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §1  CONSOLIDATION RELATIONS
+  ;
+  ; These relations are the working memory of the Consolidation
+  ; component.  Compression is a permanent audit record.
+  ; Substructure is a transient scratch pad cleared on every
+  ; SubdueCompressor cycle.
+  ; ─────────────────────────────────────────────────────────────
+
+  ; Compression — permanent audit record of a consolidation event.
+  ; Created by Automator, Compressor, LZCompressor, SubdueCompressor.
+  ; Records what was merged, what resulted, and what kind of
+  ; compression was applied.
+
+  (relation Compression
+    :Sources {}   ; set of source scheme reifiers that were merged
+    :Result  nil  ; reifier of the merged or representative scheme
+    :Kind    nil  ; automaticity | similarity | substructure | linear | hierarchical
+    :Moment  0    ; Moment compression occurred
+  )
+
+
+  ; Substructure — transient scratch pad for the SubdueCompressor.
+  ; Created fresh at the start of each compression cycle.
+  ; Retired at the end of each cycle via (with [Substructure as ?s] do (old ?s)).
+  ; Never preserved between cycles.
+
+  (relation Substructure
+    :Schemes {}   ; set of scheme reifiers forming the candidate pattern
+    :Count   0    ; number of times this substructure was observed
+    :MDL     0    ; minimum description length compression value
+    :Moment  0    ; Moment this substructure was created
+  )
+
+
+  ; Trie — a prefix tree node for LZ-style linear path compression.
+  ; Each node represents one scheme in a recurring sequential path.
+  ; Children represent possible next schemes in the sequence.
+  ; Terminal nodes hold the canonical representative reifier.
+
+  (relation Trie
+    :Scheme   nil  ; scheme reifier at this node
+    :Parent   nil  ; parent Trie node reifier  (nil = root)
+    :Children {}   ; set of child Trie node reifiers
+    :Count    0    ; number of times this prefix has been observed
+    :Terminal no   ; yes if this node ends a known recurring path
+    :Reifier  nil  ; canonical representative reifier  (terminal nodes only)
+    :Moment   0    ; Moment this node was created
+  )
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §2  CONSOLIDATION REGISTRY ENTRIES
+  ;
+  ; Tunable thresholds for all consolidation mechanisms.
+  ; All values in Moments unless noted.
+  ; ─────────────────────────────────────────────────────────────
+
+  ; Forgetting thresholds
+
+  (put (knew Registry :Key ImmediateDiscardWindow)
+    :Value 100
+    :Memo "Moments after which a zero-usage recent scheme is discarded")
+
+  (put (knew Registry :Key EventualDiscardWindow)
+    :Value 19200
+    :Memo "Moments after which a low-usage old scheme is discarded")
+
+  (put (knew Registry :Key LowUsageThreshold)
+    :Value 3
+    :Memo "Usage count below which a scheme is considered low usage")
+
+  ; Automaticity thresholds
+
+  (put (knew Registry :Key AutomaticityCountThreshold)
+    :Value 5
+    :Memo "Sequence observations needed before composite Action is formed")
+
+  (put (knew Registry :Key AutomaticityReliabilityThreshold)
+    :Value 0.81
+    :Memo "Reliability needed before composite Action is formed")
+
+  ; Compression thresholds
+
+  (put (knew Registry :Key SimilarityThreshold)
+    :Value 0.85
+    :Memo "Jaccard similarity needed before compression is applied")
+
+  (put (knew Registry :Key TrieCountThreshold)
+    :Value 5
+    :Memo "Path observations needed before LZ compression is applied")
+
+  (put (knew Registry :Key MDLThreshold)
+    :Value 0.5
+    :Memo "MDL compression ratio needed before substructure compression is applied")
+
+
+  ; ─────────────────────────────────────────────────────────────
+  ; §3  MECHANISMS — Forgetting Pattern
+  ;
+  ; Piagetian: Anomaly Rejection (Table 8).
+  ;
+  ; Forgetting is accommodative — the system discards structures
+  ; that do not contribute to a parsimonious representation of
+  ; the world. Without forgetting, the Totality accumulates noise
+  ; and the system cannot distinguish signal from artifact.
+  ;
+  ; The Amneator reclaims stale and low-value knowledge.
+  ; Forgetting combines recency with usage:
+  ;   Recent + zero usage  → discard immediately
+  ;   Old + low usage      → discard eventually
+  ;
+  ; Also reclaims spent Hypotheses, Predictions, Problems, Shocks,
+  ; and Serendipities — cognitive debris from resolved processing.
+  ; ─────────────────────────────────────────────────────────────
+
+  ; AMNEATOR — proactive agent, \@m5000 cycle  (≈ 2.6 min)
+  ;
+  ; Two forgetting passes:
+  ;   Pass 1 — recent schemes with zero usage → discard immediately
+  ;   Pass 2 — old schemes with low usage → discard eventually
+  ;
+  ; Additionally reclaims:
+  ;   Decisively disconfirmed Hypotheses
+  ;   Resolved Predictions whose Hypothesis is settled
+  ;   Closed Problems that generated a Lesson
+  ;   Spent Shocks and Serendipities
+
+  
+
+  ; ═══════════════════════════════════════════════════════════════
+  ; PATTERN REQUIRES
+  ; ═══════════════════════════════════════════════════════════════
+
+  (require  Consolidation  from  "../pattern/forgetting.pattern"    or abort)
+  (require  Consolidation  from  "../pattern/automating.pattern"    or abort)
+  (require  Consolidation  from  "../pattern/compressing.pattern"   or abort)
+  (require  Consolidation  from  "../pattern/recycling.pattern"     or abort)
+
+
+  ; ═══════════════════════════════════════════════════════════════
+  ; CONSOLIDATE LAUNCHER
+  ; ═══════════════════════════════════════════════════════════════
+
+  (function consolidate
+	(map
+		{
+		  Amneator
+		  Automator
+		  ; SKILLS ARE RULES, NOT AN AGENT, so nothing is started for
+		  ; them.  Skill-Accrete and Skill-Coin live in the Faculty and
+		  ; fire when an action's reliability crosses the bar — which
+		  ; is a knowable moment, where an agent would have scanned
+		  ; every Action the mind holds to find it.
+		  ;
+		  ; See automating.pattern.
+		  Compressor
+		  LZCompressor
+		  SubdueCompressor
+		  Recycler
+		}
+		(given {?m} (call start ?m))))
+
+
+) ;; end theory Consolidation
+
+;; ---------------  end of file -----------------
