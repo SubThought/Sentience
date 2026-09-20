@@ -1,0 +1,854 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; totality.memoria — Shared knowledge base for the GIL cognitive system.
+;;;
+;;; Contains the Relationships enumeration (common to all areas),
+;;; zone predicates, Tier/Heterarchies infrastructure, Merging bootstraps,
+;;; and requires for all six memory areas in dependency order.
+;;;
+;;;
+
+
+(theory Totality {10 0 0}
+
+  "Shared knowledge base for the GIL cognitive system."
+
+  ; ═══════════════════════════════════════════════════════════════
+  ; RELATIONSHIPS ENUMERATION
+  ;
+  ; Common to the entire Totality. Loaded before any area so that
+  ; every area and every pattern can reference relation numbers
+  ; and zone predicates without load-order dependencies.
+  ;
+  ; Result (200100) is an Observable — a relation in the Preconceptual zone.
+  ; :Result (100400) is a Slot — an action-scheme slot in the Slots zone.
+  ; Two distinct entries, two distinct purposes.
+  ; ═══════════════════════════════════════════════════════════════
+
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  ; RELATIONSHIPS
+  ; - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  (enumeration Relationships
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; UTILITY ZONE  (0 – 99,999)
+    ; ══════════════════════════════════════════════════════════
+
+    ; Foundation
+
+    None          0         ; absent reifier — default for unset :M slots
+    Awareness     100       ; ground viewpoint
+    Relation      200       ; self-describing — the relation of all relations
+    Schema        300       ; template for creating schemes
+    Resilience    400       ; coping case — affect, mood, strategy, effect
+
+    ; Loops
+
+    Once          10000     ; execute goals exactly once
+    Repeat        10100     ; execute goals N iterations
+    Until         10200     ; execute goals until condition
+    While         10300     ; execute goals while condition
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; SLOTS ZONE  (100,000 – 199,999)
+    ; ══════════════════════════════════════════════════════════
+
+    ; Action scheme slots
+
+    :Slots        100000
+    :Context      100100    ; Unison of preconditions
+    :Goals        100200    ; Series of causal actuations or sub-actions
+    :Loop         100300    ; iterations needed to complete the action
+    :Result       100400    ; Unison of postconditions
+
+    ; Reason scheme slots
+
+    :Premises     110000    ; Unison of relevant preconditions
+    :Known        110100    ; Unison of required background assumptions
+    :Lemmas       110200    ; Unison of necessary (lacuna-spanning) reasons
+    :Proof        110300    ; Series of logical operations or reasons applied
+    :Theorems     110400    ; Unison of conclusions
+
+	; Statement scheme slots
+	
+	:Thwarts	  110500	; the monads this scheme attacks
+	:Supports	  110600	; the monads this scheme supports
+
+    ; Control
+
+    Viewpoint     120000
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; PERCEPTUAL ZONE  (200,000 – 299,999)
+    ; ══════════════════════════════════════════════════════════
+
+    ; Observables
+
+    Percept       200000
+    Urge          200100
+    Attempt		  200200
+	Result        200300
+	
+	; Perception 
+	
+	Feature       210000
+    Spot		  210100
+	Figure 		  210200
+	  Icon 		  210210
+	  Shape		  210220
+	  Geon		  210230 
+	  Object      210240
+	
+	
+	
+    ; Images  (spatial schemas — Lakoff & Johnson)
+
+    Above         220000
+    Across        220100
+    Apart         220200
+    Behind        220300
+    Beside        220400
+    Boundary      220500
+    Contact       220600
+    Container     220700
+    Path          220800
+    Together      220900
+
+	
+    ; Localization  (spatial)
+
+    ; GESTALT WAS HERE, AT 230000, AND HAS BEEN REMOVED.
+    ;
+    ; It headed this branch and nothing read it — one line in this
+    ; file, no reader in any pattern or memory.  The word is wanted
+    ; for the glyph minter, where it earns its keep: a glyph marks a
+    ; whole constituted by parts that have no identity of their own,
+    ; which is what gestalt means.
+    ;
+    ; The branch stands without a head.  Every rung holds the rung
+    ; below it, so the ladder describes itself.
+    ;
+    ; 230000 IS LEFT VACANT.  An enumeration code silently reassigned
+    ; re-keys anything already stored against it.
+
+      Scene       230100
+      Venue       230200
+      Locale      230300
+      Place       230400
+      Area        230500
+      Region      230600
+      Map         230700
+
+    ; THE PERCEPTUAL RECORD, IN ORDER.
+    ;
+    ; Perception had no ordered structure at all — a Venue holds its
+    ; Scenes as a SET, and every ordered record in this tree was
+    ; imaginative.  So the mind could say `these scenes are of one
+    ; place` and could not say `I saw this one, then that one`.
+    ;
+    ; A Clip is a VISIT: the scenes of one stay in one venue, closed
+    ; on leaving and immutable thereafter.  A Video is the clips.
+
+    Clip          230800    ; the scenes of one visit, in order
+    Video         230900    ; the clips
+	
+	; Imagination  (spatial)
+		
+	Canvas		  240000	
+	Animation     240100
+	Route         240200  
+	Taxis		  240300
+	Vantage		  240400
+	Figment		  240500
+
+	; AMBIT — the imaginative counterpart of a Spot.
+	;
+	; They split because they hold different KINDS of fact: a Spot is
+	; a MEASUREMENT, where the detector found a figure; an Ambit is an
+	; ASSERTION, where the mind put a figment.
+	;
+	; One relation served both while :Fig and :In were polymorphic —
+	; and the two families turned out to share nothing else at all.
+	; An exception to a boundary doctrine is where leaks start.
+
+	Ambit         240600    ; one figment's placement on the stage
+
+	; DREAM — the imaginative counterpart of a Video.
+	;
+	; A collection of Animations, because a dream cuts from a room to
+	; a field with no traversal between.  NOT a Route: a Route crosses
+	; canvases through waypoints that CONNECT, and a dream's
+	; discontinuity is the point.
+
+	Dream         240700    ; a collection of Animations
+
+	; CLOUD 240510 AND MESH 240520 WERE HERE, AND HAVE BEEN REMOVED.
+	;
+	; A Relationships code is a SCHEME KIND — a Scheme's :R, a Case's
+	; :R, the basis of a range predicate like figure-p, the key for a
+	; Merging record.  A body is none of those: it is referenced and
+	; rendered, never activated, never cased, never merged.
+	;
+	; Vertex, Face, Edge and Blob never had codes, so this file already
+	; drew the line; now it draws it consistently.  THE ENUMERATION IS
+	; THEREFORE THE STATEMENT OF WHERE THE MARKER LINE FALLS: what is
+	; listed here carries a monad, and what is not carries a glyph or
+	; no mark at all.
+	;
+	; Both codes are LEFT VACANT rather than reused.
+
+	
+    ; ══════════════════════════════════════════════════════════
+    ; Correspondences
+    ;
+    ; A BAND OF ITS OWN, because these are a different kind of thing
+    ; from every band above.  Observables, Perception, Images,
+    ; Localization and Imagination each name WHAT THE MIND HOLDS.
+    ; These name HOW ONE BAND ANSWERS TO ANOTHER — so a correspondence
+    ; sitting inside any one of them would be filed under one of its
+    ; two ends.
+    ;
+    ; EACH IS A CONCLUSION, NOT A GIVEN.  That this form identifies
+    ; that place, that this canvas stands for that venue, that this
+    ; scene calls up that arrangement — every one is something the
+    ; mind decided and may revise.  As Schemes they carry provenance
+    ; and a degree of belief, they activate, and they can be supported
+    ; or thwarted.  A slot on either end could carry none of that, and
+    ; could hold only one answer.
+    ;
+    ; AND ACTIVATION FLOWS ACROSS THEM, which is the whole economy:
+    ; recognise the figment and its locale lights up; perceive the
+    ; scene and the arrangement it evokes comes with it.  No rule has
+    ; to fire and no lookup has to run.
+
+    Landmark      250000    ; Figment -> Locale · what identifies a place
+    Depicts       250100    ; Canvas  -> Venue  · what stands for a place
+    Evokes        250200    ; Scene   -> Taxis  · what a sight calls up
+
+    ; EMBODIES — a Figment joined to the Figure it reproduces.
+    ;
+    ; PERCEPTION IS 2D AND IMAGINATION IS 3D.  A Figure is a region
+    ; in a frame; a Figment is meshes and clouds.  So staging is not
+    ; copying a figure across a boundary — IT IS INFERRING A SOLID
+    ; FROM A PICTURE, and this records that inference.
+    ;
+    ; A HYPOTHESIS, THEREFORE, AND REVISABLE.  The SetDesigner's
+    ; three tiers are three strengths of it: reuse means `I have seen
+    ; this solid`, adapt `it is like one I know`, construct `I am
+    ; proposing a new one`.  And it is what the Projector should be
+    ; testing — render the proposed solid from the Vantage it was
+    ; seen from, and compare.
+    ;
+    ; IT WAS WRITTEN AS Grounding, AND THAT WAS A DEFECT.  The
+    ; Grounder mints Grounding :A {assembly of co-active features}
+    ; :E {percept} — THE TRIGGERS THAT EVOKE THE CLIP — and mints a
+    ; Belief alongside, empirically anchored because the assembly was
+    ; OBSERVED.  Six sites in imagining.pattern were writing
+    ; Grounding :A {cloud} :E {geon} instead, so the Grounder was
+    ; computing Beliefs over two different kinds of claim — and one
+    ; of them was never observed at all.  It was proposed.
+
+    Embodies      250300    ; Figment -> Figure · this solid is that region
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; PRECONCEPTUAL ZONE  (300,000 – 800,000)
+    ; ══════════════════════════════════════════════════════════
+
+	
+    ; Simple
+    
+	Genus         300000
+    Grounding     300100
+    Member        300200
+    Tandem        300300
+    Slot          300400
+    Swap          300500
+	Depicts		  300600
+    Symbolism     300700
+	
+
+    ; Vertical
+
+    Different     310000
+    Equivalent    310100
+    Identical     310200
+    Incompatible  310300
+    Similar       310400
+
+    ; Gates
+
+    Category      320000
+    Choice        320100
+    League        320200
+    Ordering      320300
+    Unison        320400
+    Series        320500
+
+    ; Preconceptual Derivatives
+
+    Sign          330000
+    Symbol        330100
+    Entity        330200
+    Utterance     330300
+    Route         330350     ; spatial Utterance — waypoints to destination
+    Situation     330400
+    Event         330500
+    Episode       330600
+    Dream         330700
+    Objective     330800
+    Actuation     330900
+    Action        331000
+    Distinction   331100
+
+    ; Structures
+
+    Idea          340000
+    Scenario      340100
+    Prototype     340200
+    Class         340300
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; CONCEPTUAL ZONE  (800,000 – 999,999)
+    ; ══════════════════════════════════════════════════════════
+
+    Concept       800000    ; conceptual threshold
+
+    ; Conceptual Derivatives
+
+    Hypothesis    810000
+    Causes        810100
+    Implies       810200
+    Refuter       810300
+    Metaphor      810400
+    Analogy       810500
+    Statement     810600
+    Frame         810700
+    Story         810800
+    Operation     810900
+    Reason        811000
+    Believes      811100
+    Desires       811200
+    Intends       811300
+    Obstacle      811400
+    Contradiction 811500
+    Gap           811600
+    Lacuna        811700
+    Lesson        811800
+    Theme         811900
+    Maxim         812000
+    Theory        812100
+    Narrative     812200
+    Paradigm      812300
+    Prediction    812400
+    Experiment    812500
+
+    ; Strategic Interaction
+    Game          812600    ; strategic interaction — players, norms, incentives, payoffs
+    Norm          812700    ; free-standing constraint on actors
+    Incentive     812800    ; free-standing driver toward/away from an action
+    Payoff        812900    ; outcome value for a player in a game
+
+    ; Skill
+    ;
+    ; A SKILL IS WHAT THE MIND KNOWS HOW TO DO IN A DOMAIN — the
+    ; actions and reasons that bear on a particular set of
+    ; objectives.  Skill at chess.  Skill at checkers.  Skill in
+    ; navigating political life.
+    ;
+    ; NOT A COMPETENCY, and the difference is the whole of why this
+    ; exists.  A Competency is a design pattern — agents, services
+    ; and rules, WHAT THE MIND CAN RUN.  A Skill is KNOWLEDGE: what
+    ; it has learned to try, and why.  Two minds may have identical
+    ; competencies and different skills, and a mind gains skills
+    ; without gaining any mechanism at all.
+    ;
+    ; THE DIRECTION IS OBJECTIVE -> ACTIONS, and that is the point of
+    ; it.  The objectives are the ARGUMENTS and the actions and
+    ; reasons the REFERENTS, so recognising what one is trying to do
+    ; disperses activation to everything worth trying — the mind
+    ; arrives at a chess position already primed with chess.
+    ;
+    ; Which makes it the same shape as a Landmark: recognise the
+    ; figment and the locale activates; recognise the objective and
+    ; the repertoire does.
+    ;
+    ; NO :Level SLOT, DELIBERATELY.  Utility already records attempts
+    ; and successes per Action, and skill AT something simply is how
+    ; those actions have fared.  A stored level would be a second
+    ; answer to a question already answered, and it is the stored one
+    ; that goes stale.
+    ;
+    ; NOT [Agency :Skills] EITHER.  Those are {reasoning planning
+    ; perception learning} — capabilities the AGENCY advertises, the
+    ; way a service announces what it offers to a syndicate.  They
+    ; share a word with this and nothing else.
+    ;
+    ; ── WHAT GROUPS ACTIONS AND REASONS INTO A SKILL ────────────
+    ;
+    ; NOT RECENCY.  Activation already carries recency and already
+    ; decays; grouping by it would make a skill of whatever the mind
+    ; did this afternoon.
+    ;
+    ; NOT CO-ACTIVATION ALONE, which is right for a Locale — things
+    ; lit together by a mind moving among them — and sweeps in
+    ; whatever happened to be present here.
+    ;
+    ; THREE CONDITIONS, TOGETHER:
+    ;
+    ;   SHARED OBJECTIVES.  The definitional one.  A skill IS what
+    ;   bears on an objective set, so overlap in what these actions
+    ;   have served is the evidence they belong together.  Sounds
+    ;   circular and is not: the objectives are observed, from
+    ;   Attempts that named a :Telon.
+    ;
+    ;   ONE ABSTRACTION BAND, WITH A FLOOR AND A CEILING.  Too low
+    ;   and the actions are primitives shared by everything — `move
+    ;   piece to square` belongs to chess and checkers alike and
+    ;   distinguishes neither.  Too high and they are universal —
+    ;   win, survive, avoid loss are every skill's objectives.  BOTH
+    ;   ENDS ARE NON-DIAGNOSTIC, so a skill lives in a BAND of the
+    ;   Glue tiers rather than at a point, which is where
+    ;   discrimination actually happens.
+    ;
+    ;   The same shape as the Shaper's tokens: too general and too
+    ;   specific both fail to tell things apart.
+    ;
+    ;   CONSISTENT MODALITIES.  A skill must be EXERCISABLE, and an
+    ;   action is enacted through a device.  Actions spanning
+    ;   unrelated modalities make a skill nobody can perform as one
+    ;   thing — chess is visual and manual, political navigation
+    ;   linguistic and social, and a grouping across both describes
+    ;   nothing anyone does.  Reasons inherit the modality of what
+    ;   they reason about, so the constraint binds the actions and
+    ;   follows for the reasons.
+    ;
+    ; ── A SKILL IS NOT A CHUNK, AND HAS NO COUNT BOUND ──────────
+    ;
+    ; A chunk is five to nine because it is a UNIT — a grouping held
+    ; as one thing, and a rung that must compress to be worth
+    ; climbing.  A skill is a DOMAIN, and chess is hundreds of
+    ; actions and reasons.
+    ;
+    ; The difference underneath: a chunk is defined by ENUMERATION
+    ; and a skill by CRITERION.  Membership here is a test, not a
+    ; list — so a skill ACCRETES.  Learning more chess adds to chess;
+    ; it does not make a second chess.  That is the exact opposite of
+    ; a Locale, which is made once and closed.
+    ;
+    ; ── AND A LARGE SKILL MUST DIFFERENTIATE ────────────────────
+    ;
+    ; This is the part that matters, and it follows from what a skill
+    ; is FOR.  Activation dispersing to hundreds of actions is not
+    ; priming, it is flooding — AND A SKILL THAT PRIMES EVERYTHING
+    ; PRIMES NOTHING.
+    ;
+    ; So as a skill grows it has to split: opening, middlegame,
+    ; endgame, each with its own narrower objective set, and the
+    ; objective in hand picks the branch.
+    ;
+    ; Which is what expertise looks like from outside.  A novice has
+    ; `chess`; a master has an articulated structure of it.
+    ; DIFFERENTIATION IS NOT A REFINEMENT OF SKILL — IT IS WHAT KEEPS
+    ; A SKILL USABLE AS IT GROWS, and Alternative-Differentiation
+    ; already exists to do it.
+
+    ; ── SKILL AND THEORY ARE NEIGHBOURS, NOT ALTERNATIVES ───────
+    ;
+    ; Theory 812100 is the other large criterion-defined collection
+    ; in this zone, and the two are Ryle's distinction made
+    ; structural: KNOWING-THAT and KNOWING-HOW.
+    ;
+    ;   Theory   entities, reasons, hypotheses — activated by the
+    ;            PHENOMENON it explains
+    ;   Skill    objectives, actions, reasons — activated by the
+    ;            OBJECTIVE it serves
+    ;
+    ; REASONS ARE THE OVERLAP, AND THE SAME REASON PLAYS TWO ROLES.
+    ; `The centre is valuable because it maximises mobility` is an
+    ; explanatory claim about chess and a justification for taking
+    ; the centre.  Which collection activated it decides which role
+    ; it is in — so a reason shared between a theory and a skill is
+    ; not duplication; it is one thing doing two jobs.
+    ;
+    ; WHAT EACH LACKS IS AS TELLING AS WHAT IT HOLDS.  A theory has
+    ; no objectives and no actions: it explains and cannot act.  A
+    ; skill has no entities of its own: it knows what to try and need
+    ; not know why the world is that way.  A mind with the theory and
+    ; not the skill can explain chess and not play it; with the skill
+    ; and not the theory it plays well and cannot say why.
+    ;
+    ; AND THEY ARE BUILT BY DIFFERENT MECHANISMS FROM DIFFERENT
+    ; EVIDENCE — theorizing.pattern makes theories out of anomaly,
+    ; and a skill comes from having DONE things.  Which is why these
+    ; are two relations rather than one with a flag on it.
+
+    Skill         813000    ; objectives, actions and reasons — knowing how
+
+
+    ; ══════════════════════════════════════════════════════════
+    ; AUTOGENOUS ZONE  (1,000,000+)
+    ; ══════════════════════════════════════════════════════════
+
+    Autogenous    1000000   ; self-created relations start here
+
+  )
+  
+  ; relationship-p — tests whether a value is an enumerated Relationships
+  ; value. Enumerated relationships occupy 0 … Autogenous-1.
+
+  (function relationship-p {?v}
+    (and (taxon-p ?v number)
+         (>= ?v 0)
+         (< ?v (R Autogenous))))
+
+; relationship-in-use-p — tests whether a value serves as a relation
+  ; in any scheme. The only reliable test above the Autogenous threshold,
+  ; where reifiers and self-created relations share a namespace.
+
+  (function relationship-in-use-p {?v}
+    (or (relationship-p ?v)
+        (> (tally [Scheme :R = ?v] matches 1) 0)))
+
+  ; ─────────────────────────────────────────────────────────────
+  ; THE TWO MARKERS
+  ;
+  ; A MONAD IS A MARKER IN THE MIND.  It names something the mind
+  ; reasons about — activates, remembers, believes, or offers to the
+  ; Matcher as a trait.  Monads are minted by reifier, counted, and
+  ; carry a Usage row apiece.
+  ;
+  ; A GLYPH IS A MARKER IN PERCEPTION OR IMAGINATION.  It names
+  ; something constituted and referenced but never activated: a mesh,
+  ; a cloud — the geometry carrying a form, as against the form
+  ; itself.  Glyphs are minted by gestalt and carry nothing.
+  ;
+  ; THE TEST is what needs to refer to a thing, and from how far:
+  ;
+  ;     referred to by the mind                  -> monad
+  ;     referred to from outside its container,
+  ;       but never reasoned about               -> glyph
+  ;     referred to only from inside its own
+  ;       container                              -> NO MARK AT ALL,
+  ;                                                 a position in a
+  ;                                                 tuple list
+  ;
+  ; The third row is not an omission.  A splatting scene is millions
+  ; of blobs and a depth frame is hundreds of thousands of points,
+  ; per frame; an identifier implies something may refer to it, and
+  ; at that count nothing does.
+  ;
+  ; AND THE MARKER SLOT NAMES ITS MINTER.  :M is reifier's, :G is
+  ; gestalt's, so any declaration says which side of the line it
+  ; sits on without a comment having to.
+  ;
+  ; A MONAD IS SIGNED AND A GLYPH IS NOT, which is not decoration:
+  ; dyad is (- ?monad), so a monad's negation is its dyad.  A glyph
+  ; has no dyad and none is wanted, so the unsigned taxon says so.
+  ; ─────────────────────────────────────────────────────────────
+
+  (define monad long)     ; 128 bit signed   — reifier's mark
+  (define glyph uuid)     ; 128 bit unsigned — gestalt's mark
+
+
+  ; monad-p — a monad is a long at or above the Autogenous threshold,
+  ; or its dyadic complement.
+  
+  (function monad-p {?v}
+    (and (taxon-p ?v monad)
+         (>= (abs ?v) (R Autogenous))))
+
+
+  ; glyph-p — a glyph is a uuid.  There is no threshold: glyphs share
+  ; no namespace with relationship codes, because nothing ever asks a
+  ; glyph what relation it is.
+
+  (function glyph-p {?v}
+    (taxon-p ?v glyph))
+
+
+  ; R — shorthand for relation reifier lookup by name.
+  ; Usage: (R Causes) returns the numeric reifier for Causes.
+
+  (function R {literal ?name} (enum Relationships ?name))
+
+
+  ; L — shorthand for lexeme lookup by label.
+  ; Usage: (L ?label) returns the reifier for the label.
+  ; Parallel to R: R is static (enumeration), L is dynamic (find-or-create).
+
+  (function L {?label + ?totality := Actual} (lexify ?label ?totality))
+
+
+  ; V — viewpoint accessor. Handles both numeric reifiers and symbolic names.
+  ; Usage: (V Awareness) returns the lexeme reifier for Awareness.
+  ;        (V 12345) returns 12345 as-is.
+
+  (function V {atom ?what}
+    (case (taxon ?what)
+      of number  ?what
+      of literal (L ?what)
+      else (signal Failure
+             :Name InvalidViewpoint
+             :Text ($ "viewpoint " ?what " not found."))))
+
+
+
+
+  ; ── Heterarchies ──────────────────────────────────────────────
+  ;
+  ; CAM's nine named heterarchies (Tables 8-10) mapped to
+  ; Relationship ranges and Glue :Z tiers. Makes the Arranger's
+  ; tier assignment inspectable and the abstraction gradient explicit.
+  ;
+  ; Tier regions (bottom to top):
+  ;   Perceptual  — Percept · Feature
+  ;   Categorical — Entity · Situation
+  ;   Temporal    — Event · Episode
+  ;   Behavioral  — Action · Objective
+  ;   Formal      — Concept · Operation · Theory
+
+  (enumeration Heterarchies
+    percept       1     ; raw sensory data
+    feature       2     ; extracted perceptual features
+    entity        3     ; recognized objects
+    situation     4     ; contextual configurations
+    event         5     ; actions with before/after
+    episode       6     ; sequences of events
+    action        7     ; behavioral schemes
+    concept       8     ; abstract categorical ideas
+    operation     9     ; formal operations and theories
+  )
+
+  ; Tier — maps each heterarchy to its Relationship range and Glue :Z.
+  ; The Arranger queries this to assign :Z for any Relationship number.
+
+  (relation Tier
+    :Heterarchy         ; Heterarchies enumeration value
+    :Z            0     ; Glue :Z value for this tier
+    :Low          0     ; lowest Relationship number in this tier
+    :High         0     ; highest Relationship number in this tier
+  )
+
+  ; Bootstrap tier boundaries
+  
+  (posit  [Tier :Heterarchy percept   :Z 1'000'000 :Low 200000 :High 200199]
+          [Tier :Heterarchy feature   :Z 2'000'000 :Low 200200 :High 260199]
+		  [Tier :Heterarchy entity    :Z 3'000'000 :Low 260200 :High 260399]
+		  [Tier :Heterarchy situation :Z 4'000'000 :Low 260400 :High 260499]
+		  [Tier :Heterarchy event     :Z 5'000'000 :Low 260500 :High 260599]
+		  [Tier :Heterarchy episode   :Z 6'000'000 :Low 260600 :High 260999]
+		  [Tier :Heterarchy action    :Z 7'000'000 :Low 261000 :High 799999]
+		  [Tier :Heterarchy concept   :Z 8'000'000 :Low 800000 :High 810899]
+		  [Tier :Heterarchy operation :Z 9'000'000 :Low 810900 :High 999999])
+
+  ; tier-for — returns the Glue :Z value for a given Relationship number.
+
+  (function tier-for {long ?relation}
+    (with [Tier :Low as ?lo :High as ?hi :Z as ?z]
+          (and (>= ?relation ?lo) (<= ?relation ?hi))
+      give ?z else 0))
+
+
+  ; ── Developmental Gating ────────────────────────────────────
+  ;
+  ; GIL achieves Piagetian stage-like development WITHOUT explicit
+  ; stage switches. Development is data-driven: rules fire when
+  ; their required data exists. No configurational gating needed.
+  ;
+  ; The progression emerges structurally:
+  ;
+  ; SENSORIMOTOR (0–2 equivalent):
+  ;   Only Percepts (Z=1) and Features (Z=2) exist.
+  ;   React fires — reliable reflexes. Circular reactions.
+  ;   Explorer fires — empty :Result Actions → discover postconditions.
+  ;   Perseverate fires — repeat what works.
+  ;   Recognizer fires — match patterns in Observed.
+  ;   Composer fires — fortuitous combinations.
+  ;   Assessment: Primary/secondary/tertiary circular reactions,
+  ;   object permanence (retained Activations), means-ends
+  ;   differentiation (Actions with Context → Result).
+
+
+  ;
+  ; PRECONCEPTUAL (2–7 equivalent):
+  ;   Entities (Z=3), Situations (Z=4), Events (Z=5) emerge
+  ;   through chunking and association. Preconceptual schemes exist.
+  ;   UnisonAssociator/TandemAssociator fire — co-occurrence, sequence.
+
+  ;   Ascriber fires — causal hypotheses from Events.
+  ;   Toth fires — Themes, Lessons, Maxims.
+  ;   George fires — Symbolism, Metaphor.
+  ;   Imitator fires on increasingly complex models (levels 4-6).
+  ;   Bard fires — Stories from Episodes.
+  ;   Assessment: Symbolic play, animistic thinking, transductive
+  ;   reasoning, centration (single-feature classification).
+  ;
+  ; CONCRETE OPERATIONAL (7–11 equivalent):
+  ;   Episodes (Z=6), Actions (Z=7) are well-populated.
+  ;   Deliberator fires — goal-directed action selection.
+  ;   Planner-Reason fires — logical inference replaces execution.
+  ;   Compensator fires — operational reversibility.
+  ;   Hypatia fires — Theories synthesized from converging evidence.
+  ;   Assessment: Conservation, seriation, classification hierarchies,
+  ;   reversible operations, decentration begins.
+  ;
+  ; FORMAL OPERATIONAL (11+ equivalent):
+  ;   Concepts (Z=8), Operations (Z=9) emerge.
+  ;   136 reasoning transmutation rules fire — full logical apparatus.
+  ;   Designer/Experimenter fire — systematic hypothesis testing.
+  ;   Homer fires — Narratives from structural Story patterns.
+  ;   Kuhn fires — Paradigm formation and revolution.
+  ;   Assessment: Hypothetico-deductive reasoning, propositional logic,
+  ;   combinatorial thinking, metacognition.
+  ;
+  ; No stage is "enabled." Each emerges when the system constructs
+  ; schemes at that zone through its own associative and chunking
+  ; processes. The Relationships enumeration defines the zones.
+  ; The Tier relation maps zones to :Z values. Rules requiring
+  ; higher-tier data cannot fire until that data exists.
+  ; Development IS construction.
+  ; ─────────────────────────────────────────────────────────────
+
+
+  ; ── Zone predicates ──────────────────────────────────────────
+  ;
+  ; Two forms per zone:
+  ;   -relation-p  tests a raw Relationships enumeration value
+  ;   -monad-p     tests a scheme's reifier by looking up its :R
+
+  (function utility-relation-p {long ?relation}
+    (< ?relation 100000))
+
+  (function utility-monad-p {long ?reifier}
+    (with [Scheme :M = ?reifier :R as ?rel]
+      give (utility-relation-p ?rel)))
+
+  (function preconceptual-relation-p {long ?relation}
+    (and (>= ?relation 200000) (< ?relation (R Concept))))
+
+  (function preconceptual-monad-p {long ?reifier}
+    (with [Scheme :M = ?reifier :R as ?rel]
+      give (preconceptual-relation-p ?rel)))
+
+  (function conceptual-relation-p {long ?relation}
+    (>= ?relation (R Concept)))
+
+  (function conceptual-monad-p {long ?reifier}
+    (with [Scheme :M = ?reifier :R as ?rel]
+      give (conceptual-relation-p ?rel)))
+
+
+  (enumeration Merge 
+
+    ONE   ; the sole argument activates the reifier
+    PASS  ; activation passes through unconditionally
+    NOT   ; activation is negated
+    AND   ; all arguments must be active concurrently
+    SEQ   ; arguments must activate in sequence
+    OR    ; any argument fires the reifier
+    NOR   ; fires only when no arguments are active
+    VOTE  ; fires when a quorum of arguments is active
+  )
+
+  (relation Merging
+    :R          ; relation type
+    :Merge      ; Merges enumeration value
+  )
+
+  (new Merging :R (L Category) :Merge (L Or))
+  (new Merging :R (L Choice)   :Merge (L One))
+  (new Merging :R (L League)   :Merge (L Vote))
+  (new Merging :R (L Ordering) :Merge (L Or))
+  (new Merging :R (L Unison)   :Merge (L And))
+  (new Merging :R (L Series)   :Merge (L Seq))
+  (new Merging :R (L Tandem)   :Merge (L Seq))    ; Prior must fire before Later
+  (new Merging :R (L Slot)     :Merge (L And))    ; Category + Element both active
+  (new Merging :R (L Idea)     :Merge (L And))    ; all Slots active
+  (new Merging :R (L Event)    :Merge (L And))    ; all Slots active
+  (new Merging :R (L Utterance) :Merge (L Seq))   ; phonemes in order
+  (new Merging :R (L Route)     :Merge (L Seq))   ; waypoints in order
+
+  ; ── THE CORRESPONDENCES ────────────────────────────────────────
+  ;
+  ; ALL THREE ARE Or, AND THAT IS THE WHOLE POINT OF THEM.
+  ;
+  ; A Merge says how a scheme's arguments combine to activate it.
+  ; And is the usual answer — an Idea needs all its slots, an Event
+  ; all its participants.  These want Or, because each has ONE
+  ; argument and the argument is sufficient on its own.
+  ;
+  ; Landmark: recognise the fountain and you are in that locale.
+  ; Not the fountain AND the railings AND the gate — any one
+  ; landmark places you, which is what makes a landmark useful at
+  ; all.  A mind that had to see every landmark of a place before
+  ; knowing where it was would be lost in its own neighbourhood.
+  ;
+  ; Depicts and Evokes likewise: one canvas standing for a venue is
+  ; enough to bring the venue to mind, and one scene is enough to
+  ; call up its arrangement.
+  ;
+  ; WITHOUT THESE RECORDS THE DEFAULT APPLIES SILENTLY — and a
+  ; default of And would mean a landmark never fired, which would
+  ; look like the identification mechanism not working rather than
+  ; like a missing line here.
+
+  (new Merging :R (L Landmark)  :Merge (L Or))    ; any one landmark places you
+  (new Merging :R (L Depicts)   :Merge (L Or))    ; any one depiction suffices
+  (new Merging :R (L Evokes)    :Merge (L Or))    ; any one sight calls it up
+  (new Merging :R (L Embodies)  :Merge (L Or))    ; any one reading suffices
+
+  ; A SKILL IS Or TOO, AND FOR THE SAME REASON THE OTHERS ARE.
+  ;
+  ; Any one objective in the set brings the skill to mind.  A mind
+  ; that had to hold every objective of chess before chess occurred
+  ; to it would never get started — and the whole use of a skill is
+  ; that recognising ONE thing one is trying to do primes everything
+  ; else worth trying.
+
+  (new Merging :R (L Skill)     :Merge (L Or))    ; any one objective primes it
+
+
+
+
+  ; ═══════════════════════════════════════════════════════════════
+  ; MEMORY REQUIRES
+  ;
+  ; Dependency order:
+  ;   control     — Registry relation used by all
+  ;   ontological — Scheme machinery, templates, R/L/V depend on enum above
+  ;   perceptual  — Icon/Geon bootstraps, Lexeme (moved here per Totality_040)
+  ;   associative — Cases, Trait
+  ;   imaginative — Canvas through Normal
+  ;   activative  — uses Registry + ontological; Glue (moved here per Totality_040)
+  ; ═══════════════════════════════════════════════════════════════
+
+  (require  Totality  from  "../memory/control.memory"       or abort)
+  (require  Totality  from  "../memory/ontological.memory"   or abort)
+  (require  Totality  from  "../memory/perceptual.memory"    or abort)
+  (require  Totality  from  "../memory/associative.memory"   or abort)
+  (require  Totality  from  "../memory/imaginative.memory"   or abort)
+  (require  Totality  from  "../memory/activative.memory"    or abort)
+
+
+) ;; end theory Totality
+
+;; ---------------  end of file -----------------

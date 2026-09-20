@@ -1,0 +1,385 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; attending.process — what a learner does about the world outside it.
+;;;
+;;; ══════════════════════════════════════════════════════════════════
+;;;
+;;;   A MIND STARTS ITS OWN BODY, AND ANNOUNCES ITSELF.  It does not
+;;;   own a dashboard.
+;;;
+;;;   The dashboard used to be started by gil.being, which was right
+;;;   while GIL was one mind and is wrong now — and one consequence
+;;;   decides it:
+;;;
+;;;   THE CURATOR EXISTS PARTLY TO RECORD THAT A LEARNER FELL OVER.
+;;;   If the Curator's task is owned by the learner's process, it dies
+;;;   with the learner, and the notice that would have said so goes
+;;;   with it.  THE OBSERVER CANNOT OUTLIVE THE OBSERVED IF THE
+;;;   OBSERVED IS HOLDING IT UP.
+;;;
+;;;   Three more follow.  Two learners would each start a dashboard —
+;;;   two Curators, and two servers fighting over one port.
+;;;   dashboard-down on one learner would take the dashboard away from
+;;;   every other.  And a headless learner started no Curator at all,
+;;;   so it could not enroll, though enrolling is meant to be
+;;;   independent of any of that.
+;;;
+;;; ── WHAT A LEARNER DOES INSTEAD ──────────────────────────────────
+;;;
+;;;   Sees that a dashboard is answering, and starts one DETACHED if
+;;;   none is.  Starts its DEVICE, which is its own body.  Announces
+;;;   itself.  Beats.  And holds its own process open.
+;;;
+;;;   ALL OF IT BEST-EFFORT.  A device that will not start, a
+;;;   dashboard that is not there — neither stops a mind from
+;;;   thinking, and neither should.
+;;;
+;;; *************************************************************************************
+
+(process Attending {1 0 0}
+
+  "Attending — the learner's device, its enrollment, its heartbeat."
+
+  (require Launching from "../portal/launching.theory" or abort)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §1  THE DEVICE
+  ;;;
+  ;;; A DEVICE BELONGS TO THE MIND IT SERVES, not to the dashboard
+  ;;; watching.  Eidos is this learner's eye on a world, and starting
+  ;;; it from the dashboard would have made two learners share one
+  ;;; pair of eyes.
+  ;;;
+  ;;; It also makes `:Mode test` coherent at last: a dashboard with no
+  ;;; learner has nothing to grant a token to, and the grant is the
+  ;;; whole of what test mode stands in for.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (var ?*DEVICE-TASK* nil)
+
+
+  (function run-device {}
+    "Eidos.  The device listens on one door; the Executor and the
+     portal's composer both arrive at it.
+
+     Blocks for as long as the device runs — (%) returns the
+     command's output, so it waits for the command to exit.  MEANT TO
+     BE CALLED INSIDE A TASK."
+    (in-tree "python pkg/eidos/arc/listen.py"))
+
+
+  (function start-device {}
+    "Start the device in its own task, if this learner has one."
+    (if (= (setting Eidos Psyche :Autostart) no)
+        (do (trace "[Attending] device autostart is off.")
+            no-device)
+        (do
+          (var ?tasks (concurrent (run-device)))
+          (set ?*DEVICE-TASK* (@ ?tasks 1))
+          (trace "[Attending] device started.")
+          started)))
+
+
+  (function stop-device {}
+    "Ask the device to close its session, then stop it.
+
+     TERMINATE FIRST.  A cancelled process leaves a scorecard open on
+     the competition server; a TERMINATE closes it, which is the
+     difference between a run that ended and a run that was killed."
+    (tell (setting Eidos Psyche :Url) "[TERMINATE]")
+    (unless (null-p ?*DEVICE-TASK*)
+      (cancel ?*DEVICE-TASK*)
+      (free ?*DEVICE-TASK*))
+    (set ?*DEVICE-TASK* nil)
+    stopped)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §2  ENROLLMENT — the handshake, one level up
+  ;;;
+  ;;;   Psyche  -> Registrar   [REGISTER :Psyche  …] -> [PSYCHE   …]
+  ;;;   Learner -> Curator     [ENROLL   :Learner …] -> [ENROLLED …]
+  ;;;
+  ;;; A device announces itself to a mind; a mind announces itself to
+  ;;; an observer.  Same shape, same one door, same doctrine that the
+  ;;; grant tells the asker what it needs — and it needed no new
+  ;;; mechanism at all, which is the best evidence the layering is
+  ;;; right.
+  ;;;
+  ;;; WHAT IS SENT IS WHAT CANNOT BE DISCOVERED: id, name, home,
+  ;;; being, record, and where this mind's Registrar listens.  A
+  ;;; stopped learner answers nothing, and those are precisely what it
+  ;;; takes to stop being stopped.
+  ;;;
+  ;;; THE PERCEIVER AND EXECUTOR ARE NOT SENT.  The dashboard gets
+  ;;; those from the grant when it needs them, and sending them here
+  ;;; would be the same fact in two places.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function enroll {}
+    "Announce this learner to the dashboard, if one is listening.
+
+     BEST-EFFORT, DELIBERATELY.  The mind announces and carries on
+     whether or not anything answers, exactly as a psyche retries.  A
+     headless run — a suite, a batch, a replica — needs no dashboard
+     and must not wait for one, and a dashboard started later picks
+     this learner up on its next heartbeat rather than never."
+    (var ?curator (learner-slot :Curator))
+    (if (null-p ?curator)
+        (do (trace "[Attending] no [Learner :Curator] — not announcing.")
+            not-announced)
+        (do
+          (tell ?curator
+            ($ [ENROLL
+                  :Learner   (learner-slot :Id)
+                  :Name      (learner-slot :Name)
+                  :Home      (learner-slot :Home)
+                  :Being     (learner-slot :Being)
+                  :Record    (learner-slot :Record)
+                  :Registrar (setting GIL Registrar :Url)
+                  :Totality  (setting GIL Totality :Url)
+                  :Moment    (moment)]))
+          (trace ($ "[Attending] announced " (learner-slot :Id)
+                    " to " ?curator))
+          announced)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §3  THE HEARTBEAT
+  ;;;
+  ;;; STILL HERE.
+  ;;;
+  ;;; A learner whose beat has stopped has stopped — which is the one
+  ;;; thing it cannot tell anybody itself, and the reason the
+  ;;; dashboard keeps a :Seen at all.  The Curator notices the
+  ;;; silence; this is what makes the silence mean something.
+  ;;;
+  ;;; ON [Agency :Heartbeat], which has been in the daicho since the
+  ;;; beginning and read by nothing.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (agent Heartbeat
+    (function {}
+      (when (cancelled-p (self)) (exit yes))
+      (var ?curator (learner-slot :Curator))
+      (unless (null-p ?curator)
+        (tell ?curator
+          ($ [BEAT :Learner (learner-slot :Id) :Moment (moment)]))))
+    (setting GIL Agency :Url)
+    (function {?sender ?msg} told)
+    (setting GIL Agency :Heartbeat)
+    {beating})
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §4  THE DASHBOARD, IF NOBODY HAS STARTED ONE
+  ;;;
+  ;;; A convenience, and it must not become an ownership.
+  ;;;
+  ;;; ── WHY IT IS DETACHED ──────────────────────────────────────
+  ;;;
+  ;;; THE CURATOR EXISTS PARTLY TO RECORD THAT A LEARNER FELL OVER.
+  ;;; Start it as a task this process owns and it dies with this
+  ;;; process — and the notice that would have said so goes with it.
+  ;;;
+  ;;; So the dashboard is started DETACHED and no handle is kept.
+  ;;; This learner cannot stop it, which is the point: it did not
+  ;;; start it in any sense that confers ownership; it merely noticed
+  ;;; nobody else had.
+  ;;;
+  ;;; ── WHY IT ASKS FIRST ───────────────────────────────────────
+  ;;;
+  ;;; Two learners each starting a dashboard would give two Curators
+  ;;; and two servers fighting over one port.
+  ;;;
+  ;;; ASKING IS THE RIGHT TEST, and a port check is not: a port open
+  ;;; and answering nothing is not a running dashboard, and a port
+  ;;; check would have called it one.  It is also the same question
+  ;;; the enrollment is about to ask anyway.
+  ;;;
+  ;;; ── THE PART THAT IS UNVERIFIED, AND SAID SO ────────────────
+  ;;;
+  ;;; Whether the detach idiom holds.  `start "" /b` on Windows and
+  ;;; `nohup … &` elsewhere are the usual answers, and whether a shell
+  ;;; launched by (%%) truly outlives the evaluator is not something
+  ;;; the manual settles.  If a dashboard dies with its learner, that
+  ;;; is the answer — and the remedy is to start the dashboard by
+  ;;; hand, which this function exists to make unnecessary rather
+  ;;; than impossible.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard-answering-p {}
+    "Is a Curator listening?
+
+     A running dashboard answers; a dead one does not, and a timeout
+     is the answer rather than a fault.  Two seconds, because this is
+     on the path of every start and a dashboard needing longer than
+     that to say hello is one that is not up yet."
+    (var ?curator (learner-slot :Curator))
+    (if (null-p ?curator)
+        no
+        (did (ask ?curator
+                  ($ [ASK :Of Curator :Learner (learner-slot :Id)])
+                  timeout \@s{2} default nil))))
+
+
+  (function detach {}
+    "The platform's way of leaving a process running.
+
+     WINDOWS AND POSIX DISAGREE and there is no portable form, so it
+     is configured rather than guessed — the wrong one FAILS QUIETLY:
+     the command runs, blocks, and the learner waits forever for a
+     dashboard to exit."
+    (default (setting GIL Dashboard :Detach) ""))
+
+
+  (function ensure-dashboard {}
+    "Start the dashboard if nobody has.
+
+     GATED, because a headless run — a suite, a batch, a replica —
+     has no use for a dashboard and should not open three processes
+     to find that out."
+    (if (= (setting GIL Dashboard :Autostart) no)
+        (do (trace "[Attending] dashboard autostart is off.")
+            not-wanted)
+     or (dashboard-answering-p)
+        (do (trace "[Attending] a dashboard is already answering.")
+            already-running)
+     else
+        (do
+          (trace "[Attending] no dashboard answering — starting one, detached.")
+          ;;; NO HANDLE IS KEPT.  Deliberately: see above.
+          (concurrent
+            (in-tree ($$ (detach)
+                         "premise --home \"" (learner-root) "\""
+                         " --grok \"src/portal/dashboard.theory\" --repl no")))
+          started)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §5  ATTEND
+  ;;;
+  ;;; Called from gil.being, after start-mind.
+  ;;;
+  ;;; AFTER, DELIBERATELY.  The Registrar exists before the device
+  ;;; announces itself, so registration succeeds first time rather
+  ;;; than spending the device's retries proving the mind was not up
+  ;;; yet.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function attend {}
+    "See to a dashboard, start the body, announce, beat — and then
+     hold the process open for as long as the mind is alive.
+
+     THE ORDER IS DELIBERATE.  The dashboard first, so there is a
+     Curator to enroll with a moment later; the device second, because
+     it registers with this mind and this mind is already up; the
+     enrollment third; the beat last, because there is no sense
+     reporting liveness before there is anything to be live."
+    (ensure-dashboard)
+    (start-device)
+    (enroll)
+    (start Heartbeat)
+    (tending))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6  TENDING — what holds the process open
+  ;;;
+  ;;; A MIND'S LIFETIME MUST NOT DEPEND ON WHETHER A CONSOLE WAS
+  ;;; ASKED FOR.
+  ;;;
+  ;;; With --repl no, Premise processes the command line and stops —
+  ;;; and everything the mind started goes with it, because the agents
+  ;;; are tasks in this process.  The workaround was --repl yes, which
+  ;;; held the process open by requesting a console nobody was going
+  ;;; to type at.  A headless learner, a batch run, a service under a
+  ;;; supervisor: none wants a console, and all want the mind to keep
+  ;;; running.
+  ;;;
+  ;;; ── WHY forever AND NOT complete ────────────────────────────
+  ;;;
+  ;;; (complete …) would block until the long-lived tasks finished,
+  ;;; which holds the process — and holds it OPAQUELY.  A device that
+  ;;; died would simply not be noticed, and the mind would go on
+  ;;; perceiving nothing with no account of why.
+  ;;;
+  ;;; forever checks on every iteration, so the holding does work: it
+  ;;; notices a body that has stopped, tells the dashboard, and keeps
+  ;;; thinking anyway — because a mind whose eye has failed is still
+  ;;; a mind, and stopping it would be the wrong remedy for the wrong
+  ;;; problem.
+  ;;;
+  ;;; THE IDLE IS NOT OPTIONAL.  A bare forever spins a core at a
+  ;;; hundred per cent doing nothing, which on a machine also running
+  ;;; the mind is attention taken from the thing being watched.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function tending {}
+    "Hold the process open, and watch the body while doing it."
+    (var ?was-running yes)
+    (forever
+      (if (cancelled-p (self)) (break stopped))
+
+      ;;; A BODY THAT HAS STOPPED IS WORTH SAYING ONCE.
+      ;;;
+      ;;; Once, not every second: a notice per iteration would bury
+      ;;; every other notice within a minute, and the fact worth
+      ;;; recording is that the device WENT — which happens once —
+      ;;; not that it IS gone, which is a query.
+      (var ?running (and (not (null-p ?*DEVICE-TASK*))
+                         (busy-p ?*DEVICE-TASK*)))
+      (when (and ?was-running
+                 (and (not ?running) (not (null-p ?*DEVICE-TASK*))))
+        (trace "[Attending] the device has stopped.")
+        (var ?curator (learner-slot :Curator))
+        (unless (null-p ?curator)
+          (tell ?curator
+            ($ [NOTICE :Learner (learner-slot :Id) :Kind device-stopped
+                       :Detail "the psyche's process exited"]))))
+      (set ?was-running ?running)
+
+      ;;; STOPPING IS A DECISION THE MIND MAKES, not a timeout.  The
+      ;;; loop ends when the mind is no longer running — start-mind's
+      ;;; affair — or when this task is cancelled.
+      (unless (mind-running-p) (break finished))
+
+      (idle \@s{1}))
+    (unattend)
+    attended)
+
+
+  (function mind-running-p {}
+    "Is this mind still alive?
+
+     Asked of the Mind row rather than of any agent, because a mind
+     with every agent suspended is still a mind — competencies can
+     all be spun down and the thing is not dead, only quiet."
+    (default (with [Mind :Name = (setting GIL Mind :Name) :Lifecycle as ?l]
+               give (/= ?l stopped))
+             yes))
+
+
+  (function unattend {}
+    "Close the body.  The mind's own stopping is start-mind's affair."
+    (stop-device)
+    unattending)
+
+
+) ;; end process Attending
+
+;; ---------------  end of file -----------------
