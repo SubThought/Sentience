@@ -2,7 +2,6 @@
 
 **SubThought Corporation**
 
-Michael S. P. Miller
 
 ---
 
@@ -360,7 +359,7 @@ Not a general-purpose language with a knowledge library bolted on.
 
 ```lisp
 (rule Recognise-Skill
-  memo "An active objective probes the skills; the fit primes its actions."
+  "An active objective probes the skills; the fit primes its actions."
   domain Deliberation
   salience 9600
   with [Competency :Name deliberating :Enabled yes]
@@ -393,7 +392,6 @@ https://bit.ly/3UZswXF (paperback)
 
 ## Contact
 
-**Michael S. P. Miller**
 SubThought Corporation
 
 +1 310 925 5160
