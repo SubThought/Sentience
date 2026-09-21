@@ -1,0 +1,676 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; dashboard.theory — the dashboard stack, started from Premise.
+;;;
+;;; THE FOUR COMMAND WINDOWS BECOME THREE TASKS AND ONE CALL.
+;;;
+;;; Running the dashboard used to mean opening four prompts by hand and
+;;; keeping them open.  Premise has a task system and a shell intrinsic,
+;;; so it does not have to.
+;;;
+;;;   1  pkg/eidos/arc/listen.py    the device, on 4310
+;;;   2  etc/feed/feed.py --watch   messages  ->  portal JSON
+;;;   3  src/portal/gil_serve.py    the server, on 4390
+;;;   4  the grant                  test mode only
+;;;
+;;; WHY concurrent AND NOT complete.
+;;;
+;;;   (% command) returns the command's output, so it WAITS for the
+;;;   command to exit.  Three of these four never exit — they are
+;;;   servers.  (complete …) returns after the LAST expression
+;;;   completes, so it would block forever.  (concurrent …) converts
+;;;   each expression to a task, starts them, and hands back the
+;;;   handles immediately.  Each server therefore sits in its own task
+;;;   and blocks nothing.
+;;;
+;;; THE ROOT COMES FROM THE DAICHO.  (setting GIL Paths :Root).  A
+;;; hardcoded path works on one machine, and a relative one works only
+;;; from whichever directory the evaluator happened to start in.
+;;;
+;;; WHAT THIS DOES NOT DO.  It does not build the portal.  The portal is
+;;; a Vite application; `npm run build` puts it in etc/log/portal, and
+;;; gil_serve.py serves that build.  Building belongs to whoever edits
+;;; the portal, not to starting the mind.
+;;;
+;;; *************************************************************************************
+
+(theory Dashboard {1 0 0}
+
+  "Dashboard — the audit surface, and nothing of any mind."
+
+  (require Launching from "./launching.theory" or abort)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §1  THE HANDLES
+  ;;;
+  ;;; Kept so the stack can be brought down.  A task whose handle is
+  ;;; lost cannot be cancelled and cannot be freed.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (var ?*FEED-TASK*    nil)
+  (var ?*SERVER-TASK*  nil)
+  (var ?*CURATOR-TASK* nil)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §2  PATHS
+  ;;; ─────────────────────────────────────────────────────────────
+
+  ; ── THE ACTIVE LEARNER'S HOME IS THE ROOT ───────────────────────
+  ;
+  ; It was [Machine :Home], and the name was borrowed from the wrong
+  ; thing: [Machine] is the PREMISE ABSTRACT MACHINE — the evaluator,
+  ; its home folder, its logging — and belongs in premise.daicho.
+  ;
+  ; The root these commands need is a LEARNER's, because a learner is
+  ; a distinct mind with its own tree and its own record.  Reading it
+  ; from the active learner also means the dashboard's paths follow
+  ; whichever mind it is attached to, rather than a single root that
+  ; would be wrong for every learner but one.
+
+  (function dashboard-root {}
+    "The dashboard's own tree root, from its own registry.
+
+     NOT A LEARNER'S.  The dashboard is learner-independent — it may
+     be watching several, and it may be watching none — so reading
+     [Learner :Home] out of a mind's daicho would tie the observer to
+     one of the observed.  [Dashboard :Root] in Curator.daicho is the
+     dashboard's own, and it is the installation it serves from."
+    (var ?root (setting Curator Dashboard :Root))
+    (if (null-p ?root)
+        (do (trace "[Dashboard] no [Dashboard :Root] in Curator.daicho.")
+            "")
+        ?root))
+
+
+  (function here {string ?command}
+    "Run one command with the DASHBOARD's root as the directory.
+
+     in-tree runs in a LEARNER's tree; this runs in the dashboard's.
+     They are usually the same folder and they are not the same
+     fact, and the day an installation serves two learners from one
+     dashboard they will differ."
+    (%% ($$ "cd \"" (dashboard-root) "\"") ?command))
+
+
+  (function dashboard-check {}
+    "Is the abstract machine running where this dashboard serves from?
+
+     TWO DIFFERENT THINGS, AND THAT IS THE POINT OF THE CHECK.
+
+     (setting Premise Machine :Home) is the PREMISE ABSTRACT
+     MACHINE's home — where the evaluator was started, set on the
+     command line or in premise.daicho.  [Dashboard :Root] is the
+     installation this dashboard serves.  They are usually the same
+     folder and they are not the same fact, and when they diverge
+     every relative path resolves somewhere unexpected — with the
+     symptom being a command that ran in the wrong directory rather
+     than an error.
+
+     SAY SO, DO NOT CORRECT IT.  Which is right is a deployment
+     question: one is where Premise was started and the other
+     describes an installation.  Quietly preferring either would hide
+     that they had diverged, which is the whole thing worth knowing."
+    (var ?declared (dashboard-root))
+    (var ?session  (setting Premise Machine :Home))
+    (when (and (/= ?declared "") (/= ?session ?declared))
+      (trace ($ "[Dashboard] HOME MISMATCH — the abstract machine runs in "
+                ?session " and this dashboard serves " ?declared))
+      (trace "[Dashboard] paths will resolve against the machine's."))
+    (when (= ?declared "")
+      (trace "[Dashboard] no [Dashboard :Root] — launched commands have no root."))
+    ?declared)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §3  THE THREE SERVERS
+  ;;;
+  ;;; One function each, so a single process can be started or
+  ;;; restarted without the other two — which is what a bring-up
+  ;;; session actually does.
+  ;;;
+  ;;; Each blocks for as long as its process runs.  THEY ARE MEANT TO
+  ;;; BE CALLED INSIDE A TASK, never on the interpreter task.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  ;;; THE DEVICE IS NOT STARTED HERE.  It has moved to
+  ;;; attending.process, because A DEVICE BELONGS TO THE MIND IT
+  ;;; SERVES: Eidos is one learner's eye on a world, and starting it
+  ;;; from the dashboard would have made two learners share one pair
+  ;;; of eyes.
+  ;;;
+  ;;; It also makes `:Mode test` coherent at last — a dashboard with
+  ;;; no learner has nothing to grant a token to, and the grant is
+  ;;; the whole of what test mode stands in for.
+
+
+  (function run-feed {}
+    "The feed.  etc/eidos/*.msg -> etc/log/portal-*.json, every second."
+    (here "python etc/feed/feed.py --watch"))
+
+
+  (function run-server {}
+    "The portal server.  Serves etc/log — the built app, the feed and
+     the frames — and relays a composed tuple to whoever receives it."
+    (here "python src/portal/gil_serve.py"))
+
+
+  (function run-curator {}
+    "The Curator — the dashboard's own process and knowledge base.
+
+     THE ONLY PART OF THE STACK THAT IS NOT A MIND AND NOT A VIEWER.
+     It holds what the dashboard knows: the roster, what the portal
+     itself has sent, the signal cases, the runs and the notices.
+     None of that belongs in a learner's Totality, and none of it can
+     be asked of a learner that is down.
+
+     ITS OWN PREMISE PROCESS, because it holds a knowledge base and
+     answers a handshake, and because keeping it separate makes the
+     boundary STRUCTURAL: a process with no reifiers and no schemes
+     cannot quietly start concluding things.
+
+     A LISTENING PROCESS, NOT --eval PER REQUEST.  An evaluator
+     spawned per call is fine for starting a learner and hopeless for
+     a screen polling every second."
+    (here ($$ "premise --home \"" (dashboard-root) "\""
+                 " --grok \"src/portal/curator.theory\""
+                 " --eval \"(curate)\" --repl no")))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §3a  BUILDING THE PORTAL
+  ;;;
+  ;;; The dashboard is a Vite application.  gil_dashboard.tsx is three
+  ;;; thousand lines of TypeScript with three.js in it, and nothing
+  ;;; transpiles that in a browser — so it is built, once, and
+  ;;; gil_serve.py serves the bundle.
+  ;;;
+  ;;; %% IS WHY THIS READS AS THREE STEPS AND NOT THREE SHELLS.
+  ;;;
+  ;;; Each (%) is its own process, so a directory changed by one is
+  ;;; gone when it exits and the next begins in the session folder:
+  ;;;
+  ;;;     (% "cd src/portal")   starts, changes directory, exits
+  ;;;     (% "npm install")     a NEW shell, back where it started
+  ;;;
+  ;;; (%%) runs them in ONE shell, so the cd carries — and it stops at
+  ;;; the first non-zero result, which is what keeps `npm install`
+  ;;; from running in whatever folder the session happened to be in
+  ;;; when the cd failed.
+  ;;;
+  ;;; IT RETURNS TWO ELEMENTS PER COMMAND THAT RAN, so the length says
+  ;;; how far the sequence got and the last two say what stopped it.
+  ;;; That is what lets install-failed and build-failed be told apart
+  ;;; without parsing any output: a dependency that would not install
+  ;;; and a source file that would not compile are different problems
+  ;;; with different remedies.
+  ;;;
+  ;;; THE BUNDLE LANDS OUTSIDE ITSELF.  vite.config.ts sets outDir to
+  ;;; etc/log/portal with emptyOutDir, so everything in that folder is
+  ;;; deleted on every build — which is why the feed lives beside it
+  ;;; as etc/log/portal-*.json and survives.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-folder {}
+    "Where the portal's source and its package.json live."
+    ($$ (dashboard-root) "src/portal"))
+
+
+  (function build-the-portal {}
+    "cd, npm install, npm run build — one shell, three steps.
+
+     Returns done, or which step failed.  Slow — a minute or two on a
+     cold node_modules — and blocking, which is right: there is no
+     sense serving a bundle that is still being written."
+    (var ?dir (portal-folder))
+    (trace ($ "[Dashboard] building the portal in " ?dir " ..."))
+
+    (var ?ran (%% ($$ "cd \"" ?dir "\"")
+                  "npm install"
+                  "npm run build"))
+
+    ;;; TWO ELEMENTS PER COMMAND THAT RAN, so the count is the answer:
+    ;;;   2  the cd failed — there is no such folder
+    ;;;   4  npm install failed
+    ;;;   6  all three ran; the last result says whether build passed
+    (var ?steps (/ (# ?ran) 2))
+    (var ?last  (@ ?ran (# ?ran)))
+    (var ?out   (@ ?ran (- (# ?ran) 1)))
+
+    (when (/= ?last 0)
+      (for ?l in ?out (trace ($ "    " ?l))))
+
+    (return
+      (case ?steps
+        of 1 (do (trace ($ "[Dashboard] no portal folder at " ?dir))
+                 no-portal-folder)
+        of 2 (do (trace "[Dashboard] npm install failed.")
+                 install-failed)
+        of 3 (if (/= ?last 0)
+                 (do (trace "[Dashboard] npm run build failed.")
+                     build-failed)
+                 (do (trace ($ "[Dashboard] built -> " (dashboard-root)
+                               "etc/log/portal/"))
+                     done))
+        else (do (trace "[Dashboard] the build ran nothing.")
+                 build-failed))))
+
+
+  (function portal-built-p {}
+    "Is there a bundle to serve?
+
+     gil_serve.py refuses to start without one and says how to build
+     it, so this is here to decide whether a build is NEEDED — not to
+     decide whether the portal works."
+    (var ?index ($$ (dashboard-root) "etc/log/portal/index.html"))
+    (return (did (close (file ?index)))))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §4  UP
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard {}
+    "Start the dashboard stack.  Returns the three task handles.
+
+     Called from gil.being AFTER start-mind, so the Registrar exists
+     before Eidos announces itself.  Eidos retries, so the other order
+     also works — it simply spends retries proving it."
+    (trace "[Dashboard] starting device, feed and server ...")
+
+    ;;; THE CURATOR FIRST, so a learner enrolling a moment later has
+    ;;; something to enrol with.  It is best-effort either way — the
+    ;;; mind announces into the air and carries on — but a dashboard
+    ;;; that starts its own record-keeper after the thing it is meant
+    ;;; to record is a dashboard that misses the first minute.
+    (var ?tasks (concurrent (run-curator) (run-feed) (run-server)))
+
+    (set ?*CURATOR-TASK* (@ ?tasks 1))
+    (set ?*FEED-TASK*    (@ ?tasks 2))
+    (set ?*SERVER-TASK*  (@ ?tasks 3))
+
+    (trace "[Dashboard] portal at http://127.0.0.1:4390")
+    ?tasks)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §5  THE GRANT AND THE TERMINATE HAVE MOVED.
+  ;;;
+  ;;; Both are about a DEVICE, and the device belongs to a learner.
+  ;;; A dashboard granting a token to somebody's psyche, or closing
+  ;;; somebody's scorecard, would be the observer reaching into the
+  ;;; observed.
+  ;;;
+  ;;; See attending.process.
+  ;;; ─────────────────────────────────────────────────────────────
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6  DOWN
+  ;;;
+  ;;; UNVERIFIED, AND SAID SO OUT LOUD: whether cancelling a Premise
+  ;;; task terminates the OS process that (%) started is not something
+  ;;; the manual settles.  If a port is still held after this returns,
+  ;;; that is the answer, and the device wants a TERMINATE tuple
+  ;;; instead — which it already understands.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard-down {}
+    "Stop the dashboard stack."
+    (trace "[Dashboard] stopping ...")
+
+    ;;; Ask the device to close its session first.  A cancelled process
+    ;;; leaves a scorecard open on the competition server; a TERMINATE
+    ;;; closes it, which is the difference between a run that ended and
+    ;;; a run that was killed.
+    (for ?t in {?*FEED-TASK* ?*SERVER-TASK* ?*CURATOR-TASK*}
+      (unless (null-p ?t)
+        (cancel ?t)
+        (free ?t)))
+
+    (set ?*FEED-TASK*    nil)
+    (set ?*SERVER-TASK*  nil)
+    (set ?*CURATOR-TASK* nil)
+
+    (trace "[Dashboard] stopped.")
+    stopped)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7  STATUS
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard-status {}
+    "What is up.  A task that is not busy has exited — which for a
+     server means it fell over, and is worth seeing."
+    [DASHBOARD
+      :Feed    (if (null-p ?*FEED-TASK*)   stopped
+                   (if (busy-p ?*FEED-TASK*)   running exited))
+      :Server  (if (null-p ?*SERVER-TASK*) stopped
+                   (if (busy-p ?*SERVER-TASK*) running exited))
+      :Curator (if (null-p ?*CURATOR-TASK*) stopped
+                   (if (busy-p ?*CURATOR-TASK*) running exited))
+      :Portal  (setting Curator Dashboard :Url)
+      :Moment  (moment)])
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6  ENROLMENT AND THE HEARTBEAT HAVE MOVED.
+  ;;;
+  ;;; Announcing and beating are things a LEARNER does about the
+  ;;; dashboard, not things the dashboard does.  They were here while
+  ;;; the learner started the dashboard, which was the arrangement
+  ;;; that had to change.
+  ;;;
+  ;;; See attending.process.
+  ;;; ─────────────────────────────────────────────────────────────
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6a  STARTING ANOTHER LEARNER
+  ;;;
+  ;;; A learner is a distinct mind — its own Totality, its own
+  ;;; Registrar, Perceiver and Executor, its own record on disk.
+  ;;; Starting one is starting a whole evaluator, not an agent.
+  ;;;
+  ;;; WHICH IS WHY THE HOME AND THE BEING ARE CONFIGURED AND NOT
+  ;;; DISCOVERED.  Everything else about a learner the dashboard asks
+  ;;; it for — the grant that answers a REGISTER carries the Perceiver
+  ;;; and the Executor.  But a stopped learner answers nothing, and
+  ;;; these two are precisely what it takes to stop being stopped.
+  ;;;
+  ;;; ITS OWN --home, SO ITS RELATIVE PATHS ARE ITS OWN.  Two learners
+  ;;; sharing a home would share a record directory, and the dashboard
+  ;;; would show one mind's percepts under the other's name.
+  ;;;
+  ;;; --repl no, BECAUSE NOBODY IS SITTING AT IT.  A spawned learner
+  ;;; is not an interactive session; it starts, it registers, it runs.
+  ;;; A console it would be talking to nobody through is a console
+  ;;; holding the process open for no reason.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function spawn-learner {literal ?id}
+    "Start another learner, by its configured home and entry point.
+
+     BY :Id, NOT BY NAME.  The identifier is what the roster, the
+     dashboard and a LEARNER tuple all name a learner by; :Name is
+     what an operator reads, and a display name may be changed,
+     translated or repeated where an identifier may not."
+    ;;; THE ROSTER IS THE DASHBOARD'S, so this asks the Curator
+    ;;; rather than reading a list this learner has no business
+    ;;; keeping.  A learner that enrolled told the dashboard where it
+    ;;; actually lives; a configured list could only hold where
+    ;;; somebody expected it to.
+    (var ?row (parse (ask (setting GIL Learner :Curator)
+                          ($ [ASK :Of Learner :Id ?id]))))
+    (var ?home  (:Home ?row))
+    (var ?being (:Being ?row))
+    (var ?name  (default (:Name ?row) (string ?id)))
+
+    (if (or (null-p ?home) (null-p ?being))
+        (do (trace ($ "[Dashboard] no [Learner :Id " ?id "], or no :Home / :Being."))
+            [LEARNER :Id ?id :Status Unknown])
+        (do
+          (trace ($ "[Dashboard] starting learner " ?name " (" ?id ") in " ?home))
+          ;;; ITS OWN TASK, like the three servers, and for the same
+          ;;; reason: (%) waits for its command to exit, and a mind
+          ;;; does not exit.
+          (var ?task
+            (concurrent
+              (%% ($$ "cd \"" ?home "\"")
+                  ($$ "premise --home \"" ?home "\""
+                      " --grok \"" ?being "\" --repl no"))))
+          [LEARNER :Id ?id :Name ?name :Status Starting
+                   :Home ?home :Being ?being :Moment (moment)])))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7a  THE AUDITS
+  ;;;
+  ;;; Four checks, and they are the definition of done for the
+  ;;; boundary: no model anywhere, no ARC vocabulary in the mind, no
+  ;;; hardcoded action names, and a psyche that speaks only in tuples.
+  ;;;
+  ;;; RUN AT STARTUP, NOT REMEMBERED.  The last time the rule was
+  ;;; scoped by hand it was honoured while the boundary leaked, because
+  ;;; `action1`, `WIN` and `levels_completed` are ARC facts rather than
+  ;;; LS20 facts.  A check nobody runs is a check that does not exist.
+  ;;;
+  ;;; The script is sh, and PowerShell is the fallback — one shell
+  ;;; either way, with the cd carried by %%.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard-audit {}
+    "Run etc/audit.sh over the tree.  Returns clean, or dirty."
+    (trace "[Dashboard] auditing the boundary ...")
+    (var ?ran (here "sh etc/audit.sh ."))
+    (var ?out (@ ?ran 1))
+    (var ?rc  (@ ?ran 2))
+    (for ?l in ?out (trace ($ "    " ?l)))
+    (if (= ?rc 0) (return clean) (return dirty)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §8  THE RUN
+  ;;;
+  ;;; NOTHING IS TYPED AT A CONSOLE.  A run is a configuration, not a
+  ;;; sequence of things somebody remembered to do — so the daicho
+  ;;; says what happens and this carries it out in one call.
+  ;;;
+  ;;; Typing the steps means a run can be got wrong by hand, and means
+  ;;; it cannot be reproduced from the file that describes it.  A
+  ;;; campaign run overnight and a campaign run by an operator at a
+  ;;; keyboard must be the same campaign, or the evidence is not
+  ;;; comparable.
+  ;;;
+  ;;; THE ORDER IS DELIBERATE:
+  ;;;
+  ;;;   certify  BEFORE anything starts.  A mind whose suites fail is
+  ;;;            a mind whose run means nothing, and finding that out
+  ;;;            after forty minutes of play is finding it out too
+  ;;;            late.  A failure aborts the run rather than warning
+  ;;;            about it.
+  ;;;
+  ;;;   start    the device, the feed and the server.
+  ;;;
+  ;;;   status   once, after starting, so the trace records what
+  ;;;            actually came up rather than what was asked for.
+  ;;;
+  ;;;   halt     only where the run is a batch.  An interactive
+  ;;;            session brings itself down when the operator is
+  ;;;            finished, not when startup ends.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function dashboard-run {}
+    "Do what the daicho says.  Called from gil.being; called by hand
+     only when a stack was brought down and is being brought back."
+
+    ;;; ── check ────────────────────────────────────────────────
+    ;;;
+    ;;; FIRST, because everything after it is built from the root.  A
+    ;;; mismatch found here is a line in the trace; found later it is
+    ;;; an npm install in the wrong directory and a feed nobody reads.
+    (dashboard-check)
+
+    ;;; ── certify ──────────────────────────────────────────────
+    (when (= (setting Curator Dashboard :Certify) yes)
+      (trace "[Dashboard] certifying ...")
+      (var ?issues (certify))
+      (if (= ?issues QED)
+          (trace "[Dashboard] QED — every suite passed.")
+          (do
+            ;;; ABORT, NOT WARN.  A run made on a mind that fails its
+            ;;; own suites produces evidence nobody can use, and the
+            ;;; failure is cheaper to read here than to infer later
+            ;;; from a campaign that behaved oddly.
+            (trace ($ "[Dashboard] CERTIFY FAILED — " (# ?issues)
+                      " issue(s).  The run is abandoned."))
+            (for ?i in ?issues (trace ($ "    " ?i)))
+            (return ?issues))))
+
+    ;;; ── audit ────────────────────────────────────────────────
+    ;;;
+    ;;; AFTER certify, BEFORE anything starts.  The suites say the
+    ;;; mechanisms work; the audits say the boundary held while they
+    ;;; did.  Both are cheap, and both are worth more before a
+    ;;; campaign than after one.
+    (when (= (setting Curator Dashboard :Audit) yes)
+      (when (/= (dashboard-audit) clean)
+        (trace "[Dashboard] the audit failed.  The run is abandoned.")
+        (return audit-failed)))
+
+    ;;; ── build ────────────────────────────────────────────────
+    ;;;
+    ;;; BEFORE STARTING, because gil_serve.py refuses to serve without
+    ;;; a bundle — and a build that runs while the server is up would
+    ;;; delete the folder underneath it, emptyOutDir being what it is.
+    ;;;
+    ;;;   always   build every run.  Right while editing the portal.
+    ;;;   missing  build only when there is no bundle.  Right for a
+    ;;;            campaign, where a two-minute npm install before
+    ;;;            every run is two minutes of nothing.
+    ;;;   no       never.  The bundle is built by hand or by CI.
+    ;;;
+    ;;; A FAILED BUILD ABANDONS THE RUN, like a failed certify: a
+    ;;; campaign with no audit surface is a campaign whose decisions
+    ;;; cannot be read afterwards.
+    (var ?build (default (setting Curator Dashboard :Building) missing))
+    (when (or (= ?build always)
+              (and (= ?build missing) (not (portal-built-p))))
+      (var ?made (build-the-portal))
+      (when (/= ?made done)
+        (trace ($ "[Dashboard] the portal did not build (" ?made
+                  ").  The run is abandoned."))
+        (return ?made)))
+
+    ;;; ── start ────────────────────────────────────────────────
+    (when (= (setting Curator Dashboard :Autostart) yes)
+      (dashboard))
+
+    ;;; ── status ───────────────────────────────────────────────
+    ;;;
+    ;;; ONCE, and after.  A status taken before the tasks have been
+    ;;; given a moment reports what was requested rather than what
+    ;;; came up — and a server that fell over on its first line is
+    ;;; exactly the case this is for.
+    (when (= (setting Curator Dashboard :Status) yes)
+      (var ?s (dashboard-status))
+      (trace ($ "[Dashboard] " ?s))
+      (when (or (= (:Feed ?s) exited)
+                (or (= (:Server ?s) exited) (= (:Curator ?s) exited)))
+        (trace "[Dashboard] something exited at once — see etc/log.")))
+
+    ;;; ── halt, or hold ────────────────────────────────────────
+    ;;;
+    ;;; A BATCH RUN STOPS ITSELF.  Everything else holds open, and
+    ;;; watches while it does.
+    (if (= (setting Curator Dashboard :Halt) yes)
+        (do (dashboard-down) finished)
+        (minding)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §8a  MINDING — what holds the dashboard open
+  ;;;
+  ;;; THE SAME PROBLEM AS A LEARNER'S, AND THE SAME ANSWER.
+  ;;;
+  ;;; With --repl no the evaluator stops when the command line is
+  ;;; done and the three tasks go with it.  Holding the process open
+  ;;; by requesting a console nobody types at is using the wrong
+  ;;; thing for the job.
+  ;;;
+  ;;; ── AND HERE THE WATCHING MATTERS MORE ──────────────────────
+  ;;;
+  ;;; :Status reported once, at startup, what came up.  That catches
+  ;;; a server which fell over on its first line and nothing after.
+  ;;; A server that dies an hour in looks, from every screen, exactly
+  ;;; like a mind that has gone quiet — which is the misreading this
+  ;;; loop exists to prevent.
+  ;;;
+  ;;; NOTICED ONCE EACH, not every second.  What is worth recording
+  ;;; is that a process WENT, which happens once; that it IS gone is
+  ;;; a query, and dashboard-status answers it.
+  ;;;
+  ;;; THE DASHBOARD DOES NOT RESTART WHAT DIED.  It says so and keeps
+  ;;; going — a record-keeper that quietly repaired things would be a
+  ;;; record-keeper whose record no longer described what happened.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function minding {}
+    "Hold the dashboard open, and watch its three processes."
+    (var ?were (dashboard-status))
+    (forever
+      (if (cancelled-p (self)) (break stopped))
+
+      (var ?now (dashboard-status))
+      (for ?part in {:Curator :Feed :Server}
+        (when (and (= (?part ?were) running) (= (?part ?now) exited))
+          (trace ($ "[Dashboard] " ?part " has exited."))
+          (notice-loss ?part)))
+      (set ?were ?now)
+
+      ;;; THE CURATOR IS THE ONE THAT MATTERS.  The feed and the
+      ;;; server are viewers and their loss is an inconvenience; the
+      ;;; Curator holds the record, and a dashboard running without
+      ;;; one is recording nothing while appearing to work.
+      (when (= (:Curator ?now) exited)
+        (trace "[Dashboard] the Curator has gone — nothing is being recorded."))
+
+      (idle \@s{2}))
+    (dashboard-down)
+    finished)
+
+
+  (function notice-loss {literal ?part}
+    "Tell the Curator that something went — if the Curator is the one
+     still there to be told.
+
+     A CURATOR THAT HAS DIED CANNOT RECORD ITS OWN DEATH, which is
+     why the trace above says it as well.  The one fact this whole
+     apparatus cannot capture about itself is its own ending."
+    (unless (= ?part :Curator)
+      (tell (setting Curator Curator :Url)
+        ($ [NOTICE :Kind process-exited :Detail (string ?part)]))))
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §9  AND IT RUNS ITSELF
+  ;;;
+  ;;;     premise --home "…/1.0/gil/" \
+  ;;;             --grok "src/portal/dashboard.theory" --repl no
+  ;;;
+  ;;; GROKKING THE FILE STARTS THE DASHBOARD.  No --eval to remember
+  ;;; and get wrong, and one command that is the same in a script, in
+  ;;; a service definition and in an operator's hands.
+  ;;;
+  ;;; WHICH IS WHY NOTHING MAY REQUIRE THIS FILE.  A require would
+  ;;; run it, and a learner requiring it would start a dashboard
+  ;;; inside every mind — which is the arrangement this whole split
+  ;;; exists to end.  The helpers both sides need are in
+  ;;; launching.theory, which starts nothing by being required.
+  ;;;
+  ;;; THE DASHBOARD OWNS NO MIND.  It starts the Curator, the feed
+  ;;; and the server — a record-keeper and two viewers.  Learners
+  ;;; start themselves and announce.
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (dashboard-run)
+
+
+) ;; end theory Dashboard
+
+;; ---------------  end of file -----------------

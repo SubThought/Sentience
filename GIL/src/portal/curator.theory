@@ -1,0 +1,661 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; curator.theory — the dashboard's own mind-shaped process.
+;;;
+;;; ══════════════════════════════════════════════════════════════════
+;;;
+;;;   IT RECORDS.  IT DOES NOT CONCLUDE.
+;;;
+;;;   That sentence is the whole design, and everything below follows
+;;;   from it.  The Curator holds RELATIONS and answers TUPLES.  It
+;;;   has no Totality of thought: no schemes, no activation, no
+;;;   reasoning, no reifiers.  A dashboard that inferred things would
+;;;   be a second mind with a worse view than the first, and the two
+;;;   would eventually disagree about a learner they both watch.
+;;;
+;;;   Keeping it in a separate process makes that boundary STRUCTURAL
+;;;   rather than a rule somebody has to remember.
+;;;
+;;; ── WHY IT EXISTS AT ALL ─────────────────────────────────────────
+;;;
+;;;   Three things the dashboard knows that no learner can:
+;;;
+;;;   WHAT IT ITSELF SENT.  The dashboard is a sender in three places
+;;;   — the Attempts composer, the Signals screen, the Competency
+;;;   toggle.  Without a record of those, THE ARCHIVE CANNOT TELL AN
+;;;   ATTEMPT THE MIND DECIDED FROM ONE A PERSON TYPED, and this
+;;;   entire project rests on evidence being auditable.  That is the
+;;;   first reason and the strongest.
+;;;
+;;;   WHAT IT ASKED.  A signal case is a stimulus, an expectation and
+;;;   a deadline.  A mind should not keep a record of having been
+;;;   probed; the prober should.
+;;;
+;;;   WHAT IT SAW ACROSS LEARNERS.  Cost per win, frontier burn-down,
+;;;   assimilation ratio — compared across runs and across minds,
+;;;   which is exactly what no single mind can hold.
+;;;
+;;;   And one it knows about minds that are DOWN.  A learner that has
+;;;   fallen over cannot write down that it fell over.
+;;;
+;;; ── WHAT IT MUST NEVER HOLD ──────────────────────────────────────
+;;;
+;;;   Anything derived from a learner's Totality.  Cases, activations,
+;;;   schemes, remindings, canvases — those are read through that
+;;;   learner's own portal.theory and NEVER COPIED HERE.  A second
+;;;   reader with its own scoring is the failure this tree keeps
+;;;   finding; a second COPY is the same failure with a delay on it.
+;;;
+;;;   Competency profiles are not here either.  A competency is a
+;;;   design pattern in a particular mind, and two learners may not
+;;;   have the same ones.  Profiles belong in the learner's Totality.
+;;;
+;;; ── THE HANDSHAKE, ONE LEVEL UP ──────────────────────────────────
+;;;
+;;;   A psyche announces itself to a mind's Registrar and is granted a
+;;;   token and the addresses it should speak on.  A LEARNER
+;;;   announces itself HERE and is granted its place in the roster.
+;;;
+;;;     Psyche  -> Registrar   [REGISTER :Psyche  …] -> [PSYCHE  …]
+;;;     Learner -> Curator     [ENROLL   :Learner …] -> [ENROLLED …]
+;;;
+;;;   Same shape, same one door, same doctrine that the grant tells
+;;;   the asker what it needs.  That the existing mechanism fits
+;;;   unaltered is the strongest evidence the layering is right.
+;;;
+;;;   ANNOUNCING IS BEST-EFFORT.  A learner announces and carries on
+;;;   whether or not anything answers — as Eidos retries.  So a
+;;;   headless run needs no dashboard at all, and a dashboard started
+;;;   later picks learners up on their next heartbeat.
+;;;
+;;; ── WHAT IS LOST ON RESTART DEPENDS ON THE ADAPTER ───────────────
+;;;
+;;;   [Curator :Adapter] is configured, not decided here.  On
+;;;   ephemeral-kb the roster and the injections go when the process
+;;;   does; on a durable adapter they do not.  THE SCREENS MUST SAY
+;;;   WHICH, because an injections record that silently starts empty
+;;;   looks like a dashboard that has sent nothing — a claim about
+;;;   the mind rather than about the adapter.
+;;;
+;;; *************************************************************************************
+
+(theory Curator {1 0 0}
+
+  "Curator — what the dashboard has observed, and what it sent."
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §1  THE ROSTER
+  ;;;
+  ;;; WHO EXISTS, AND WHAT IT TAKES TO START ONE.
+  ;;;
+  ;;; Three kinds of knowledge about a learner, and only one of them
+  ;;; is durable:
+  ;;;
+  ;;;   CONFIGURED   id, name, home, being, record — what it takes to
+  ;;;                START one.  Must persist outside every mind,
+  ;;;                because A STOPPED LEARNER CANNOT ANSWER.
+  ;;;
+  ;;;   GRANTED      perceiver, executor, token — arrives in the
+  ;;;                PSYCHE grant.  Discovered, never stored.
+  ;;;
+  ;;;   OBSERVED     running, attached to — true only while running.
+  ;;;                Asked, never stored.
+  ;;;
+  ;;; Storing the second or third would be the Device :Status failure
+  ;;; over again: a copy going stale while the truth moves.
+  ;;;
+  ;;; :Seen IS THE ONE VOLATILE SLOT, and it earns its place.
+  ;;; Liveness cannot be ASKED of something that is down, and "when
+  ;;; did anyone last hear from this" is exactly what an operator
+  ;;; needs to know about a learner that is not answering.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Learner
+    :Id        nil     ; what everything names it by
+    :Name      ""      ; what an operator reads
+    :Home      ""      ; to start it
+    :Being     ""      ; to start it
+    :Record    ""      ; where its messages land
+    :Registrar ""      ; its own Registrar — the one configured url
+    :Totality  ""      ; for display: what it is attached to
+    :Born      0       ; first enrolment
+    :Seen      0       ; last heartbeat
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §2  PSYCHES
+  ;;;
+  ;;; Which devices which learner has admitted.
+  ;;;
+  ;;; THE LEARNER KNOWS THIS ALREADY — its Registrar minted a Device
+  ;;; row.  What is kept here is the CROSS-LEARNER view: two learners
+  ;;; on one Eidos, a psyche that registered with the wrong mind, a
+  ;;; device answering nobody.  None of those is visible from inside
+  ;;; any single mind.
+  ;;;
+  ;;; And it survives the learner.  A mind that has fallen over takes
+  ;;; its Device rows with it, and the question afterwards is usually
+  ;;; what it had been talking to.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Psyche
+    :Learner   nil     ; whose
+    :Name      nil     ; Eidos, Expanse
+    :Address   ""      ; its door
+    :Channels  {}      ; what it offers
+    :Seen      0       ; last tuple observed from it
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §3  INJECTIONS
+  ;;;
+  ;;; EVERY TUPLE THE DASHBOARD ITSELF SENT.
+  ;;;
+  ;;; THIS IS THE FIRST REASON THE CURATOR EXISTS.  The portal is a
+  ;;; viewer everywhere and a sender in exactly three places: the
+  ;;; Attempts composer, the Signals screen, the Competency toggle.
+  ;;;
+  ;;; Without this record the archive cannot distinguish an attempt
+  ;;; the mind DECIDED from one a person TYPED — and a campaign whose
+  ;;; evidence cannot be told apart from its operator's interference
+  ;;; is a campaign that proves nothing.  Forty-five live runs are
+  ;;; worth what they are worth because nobody was helping.
+  ;;;
+  ;;; RECORDED WHETHER IT SUCCEEDED OR NOT.  A tuple that failed to
+  ;;; send still tells you what somebody tried, and a refusal is
+  ;;; evidence about the gate rather than absence of evidence.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Injection
+    :Learner   nil     ; to which mind
+    :Head      nil     ; ATTEMPT, PERCEPT, COMPETENCY, PSYCHE …
+    :Tuple     ""      ; verbatim, as sent
+    :Whom      ""      ; where it went
+    :Answer    ""      ; what came back, or the error
+    :Screen    nil     ; which screen sent it
+    :Moment    0
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §4  SIGNAL CASES
+  ;;;
+  ;;; A stimulus, an expectation, a deadline, and what happened.
+  ;;;
+  ;;; THE PROBER KEEPS THE RECORD, NOT THE PROBED.  A mind has no
+  ;;; business holding an account of having been experimented on —
+  ;;; it would be evidence about the experimenter sitting in the
+  ;;; evidence about the mind.
+  ;;;
+  ;;; :Met is three-valued on purpose.  `waiting` is not `missed`:
+  ;;; a case still within its deadline has not failed, and collapsing
+  ;;; the two would make every case that is merely slow look like a
+  ;;; case that went wrong.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Signal
+    :Learner   nil     ; which mind was probed
+    :Sent      ""      ; the afferent tuple, verbatim
+    :Expect    nil     ; ATTEMPT | RESULT
+    :Match     ""      ; the slot expression that had to match
+    :Deadline  0       ; how long, in its units
+    :Units     beats   ; beats | moments
+    :Met       waiting ; waiting | met | missed
+    :Got       ""      ; the answering tuple, where one came
+    :Latency   0       ; how long it took
+    :Moment    0
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §5  RUNS
+  ;;;
+  ;;; One bounded episode per learner — which world, when it opened,
+  ;;; how it ended.
+  ;;;
+  ;;; THE LEDGER ALREADY EXISTS, one line per run, on each learner's
+  ;;; own disk.  This is the INDEX ACROSS THEM: the same campaign run
+  ;;; by two learners, or by one learner before and after a
+  ;;; competency was spun up, is a comparison neither learner's ledger
+  ;;; can make.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Run
+    :Learner   nil
+    :World     nil     ; the channel — ls20-9607e27b
+    :Opened    0
+    :Closed    0
+    :Levels    0       ; how far it got
+    :Actions   0       ; what it spent
+    :Outcome   nil     ; attained | terminated | abandoned | running
+    :Profile   ""      ; which competencies were up, by name
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6  MEASURES
+  ;;;
+  ;;; Derived per run; compared across runs and across learners.
+  ;;;
+  ;;; THE NUMBERS THAT MAKE THE CLAIM MEASURED RATHER THAN ASSERTED —
+  ;;; cost per win, frontier burn-down, assimilation ratio,
+  ;;; exploration rate, model confirmation.  μ-GIL's curves exist;
+  ;;; recomputing them for GIL is what turns "it works" into a result.
+  ;;;
+  ;;; ONE ROW PER MEASURE PER RUN, rather than a wide row of every
+  ;;; measure, because the set of measures will grow and a wide row
+  ;;; would have to be altered every time it did.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Measure
+    :Run       nil
+    :Learner   nil
+    :Name      nil     ; cost-per-win, frontier, assimilation …
+    :Value     0.0
+    :At        0       ; the decision or run index it was taken at
+  )
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7  NOTICES
+  ;;;
+  ;;; The dashboard's own observations about health.
+  ;;;
+  ;;; A LEARNER THAT HAS FALLEN OVER CANNOT WRITE DOWN THAT IT FELL
+  ;;; OVER.  Nothing else records a mind that stopped answering, a
+  ;;; build that failed, an audit that came back dirty — and those
+  ;;; are precisely the facts wanted afterwards, when the thing that
+  ;;; would have recorded them is the thing that is gone.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (relation Notice
+    :Learner   nil     ; whom it concerns, or nil for the dashboard
+    :Kind      nil     ; silent | build-failed | audit-dirty | enrolled …
+    :Detail    ""
+    :Moment    0
+  )
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §8  ENROLMENT — the handshake
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (function enroll {?t}
+    "Absorb [ENROLL :Learner … ] and answer [ENROLLED …].
+
+     UPDATES, IT DOES NOT DUPLICATE.  A learner restarting announces
+     itself again; a second row would leave the first holding a
+     :Seen that nothing will ever advance, and an operator looking at
+     two rows for one mind.
+
+     :Born SURVIVES.  When the mind was first seen is a different
+     fact from when it was last seen, and restarting does not make it
+     new."
+    (var ?id (:Learner ?t))
+    (if (null-p ?id)
+        [ENROLLED :Status Refused :Reason "no :Learner slot"]
+        (do
+          (var ?row (with [Learner :Id = ?id] give ?me))
+          (if (null-p ?row)
+              (do
+                (new Learner
+                  :Id        ?id
+                  :Name      (default (:Name ?t) (string ?id))
+                  :Home      (default (:Home ?t) "")
+                  :Being     (default (:Being ?t) "")
+                  :Record    (default (:Record ?t) "")
+                  :Registrar (default (:Registrar ?t) "")
+                  :Totality  (default (:Totality ?t) "")
+                  :Born      (moment)
+                  :Seen      (moment))
+                (notice ?id enrolled ($ "first seen: " ?id)))
+              (put ?row
+                :Name      (default (:Name ?t) (:Name ?row))
+                :Home      (default (:Home ?t) (:Home ?row))
+                :Being     (default (:Being ?t) (:Being ?row))
+                :Record    (default (:Record ?t) (:Record ?row))
+                :Registrar (default (:Registrar ?t) (:Registrar ?row))
+                :Totality  (default (:Totality ?t) (:Totality ?row))
+                :Seen      (moment)))
+          [ENROLLED :Status Granted :Learner ?id :Moment (moment)])))
+
+
+  (function heartbeat {?t}
+    "A learner saying it is still there.
+
+     Cheaper than an enrolment and carrying nothing but the fact.
+     A learner whose :Seen has stopped advancing is a learner that
+     has stopped — which is the one thing it cannot tell anybody
+     itself."
+    (var ?id (:Learner ?t))
+    (with [Learner :Id = ?id] as ?row
+      do (put ?row :Seen (moment)))
+    [BEAT :Learner ?id :Moment (moment)])
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §9  RECORDING
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (function record-injection {?t}
+    "Write down a tuple the dashboard sent.
+
+     WHETHER OR NOT IT SUCCEEDED.  A tuple that failed to send still
+     tells you what somebody tried, and a refusal is evidence about
+     the gate rather than an absence of evidence."
+    (new Injection
+      :Learner (:Learner ?t)
+      :Head    (:Head ?t)
+      :Tuple   (default (:Tuple ?t) "")
+      :Whom    (default (:Whom ?t) "")
+      :Answer  (default (:Answer ?t) "")
+      :Screen  (default (:Screen ?t) unknown)
+      :Moment  (moment))
+    [RECORDED :Of Injection :Moment (moment)])
+
+
+  (function record-signal {?t}
+    "Open or settle a signal case.
+
+     OPENED WHEN SENT, SETTLED WHEN ANSWERED — one row, twice
+     written, rather than two rows to be paired up afterwards.  A
+     case that is never settled stays `waiting`, which is the honest
+     record of a probe whose answer never came."
+    (var ?open (with [Signal :Learner = (:Learner ?t) :Met = waiting] give ?me))
+    (if (and (thing-p ?open) (thing-p (:Got ?t)))
+        (do
+          (put ?open
+            :Met     (default (:Met ?t) met)
+            :Got     (default (:Got ?t) "")
+            :Latency (default (:Latency ?t) 0))
+          [RECORDED :Of Signal :Status (:Met ?open)])
+        (do
+          (new Signal
+            :Learner  (:Learner ?t)
+            :Sent     (default (:Sent ?t) "")
+            :Expect   (:Expect ?t)
+            :Match    (default (:Match ?t) "")
+            :Deadline (default (:Deadline ?t) 0)
+            :Units    (default (:Units ?t) beats)
+            :Met      waiting
+            :Moment   (moment))
+          [RECORDED :Of Signal :Status waiting])))
+
+
+  (function notice {?learner literal ?kind string ?detail}
+    "Write down something the dashboard observed."
+    (new Notice :Learner ?learner :Kind ?kind
+                :Detail ?detail :Moment (moment))
+    ?kind)
+
+
+  (function curator-ask {?t}
+    "Answer a question about what is known.
+
+     A ROW, NOT A FEED.  The feeds are for screens, which poll and
+     want everything; this is for a mechanism that wants one thing
+     and wants it now — spawn-learner asking where a learner lives,
+     because the roster is the dashboard\'s and a learner has no
+     business keeping one.
+
+     AN UNKNOWN LEARNER IS ANSWERED, NOT IGNORED.  Nothing here
+     means nothing is known, and a caller told so can say which
+     learner it was asked about — where silence would leave it
+     guessing whether the Curator was down."
+    (case (:Of ?t)
+      of Learner
+        (with [Learner :Id = (:Id ?t) :Name as ?n :Home as ?h
+                       :Being as ?b :Record as ?rec :Registrar as ?reg
+                       :Totality as ?tot :Born as ?born :Seen as ?seen]
+          give [LEARNER :Id (:Id ?t) :Name ?n :Home ?h :Being ?b
+                        :Record ?rec :Registrar ?reg :Totality ?tot
+                        :Born ?born :Seen ?seen]
+          else [LEARNER :Id (:Id ?t) :Status Unknown])
+      else
+        [ANSWER :Of (:Of ?t) :Status Unknown]))
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §10  THE SILENCE WATCH
+  ;;;
+  ;;; A learner whose :Seen has stopped advancing has stopped.
+  ;;;
+  ;;; NOTICED ONCE, NOT EVERY PASS.  A notice per cycle for a mind
+  ;;; that is down would bury every other notice within a minute —
+  ;;; and the fact worth recording is that it WENT silent, which
+  ;;; happens once, not that it IS silent, which is a query.
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (agent Curator
+    (function {}
+      (when (cancelled-p (self)) (exit yes))
+      (var ?now  (moment))
+      (var ?wait (setting Curator Curator :Silence))
+      (with [Learner :Id as ?id :Seen as ?seen]
+            (and (> ?seen 0) (> (- ?now ?seen) ?wait))
+        do
+        (unless (with [Notice :Learner = ?id :Kind = silent] give yes)
+          (notice ?id silent ($ "no heartbeat since " ?seen)))))
+
+    (setting Curator Curator :Url)
+
+    ;;; ── THE ONE DOOR ────────────────────────────────────────────
+    ;;;
+    ;;; Same doctrine as everywhere else: one address, one handler,
+    ;;; routed by the tuple's head.  A learner enrolling, a dashboard
+    ;;; recording what it sent, and a screen asking what is known all
+    ;;; arrive the same way.
+    (function {?sender ?message}
+      (var ?t (parse ?message))
+      (case (top ?t)
+        of ENROLL    (tell ?sender ($ (enroll ?t)))
+        of BEAT      (tell ?sender ($ (heartbeat ?t)))
+        of INJECTED  (tell ?sender ($ (record-injection ?t)))
+        of SIGNALLED (tell ?sender ($ (record-signal ?t)))
+        of NOTICE    (tell ?sender
+                       ($ [RECORDED :Of Notice
+                                    :Kind (notice (:Learner ?t) (:Kind ?t)
+                                                  (default (:Detail ?t) ""))]))
+        of ASK       (tell ?sender ($ (curator-ask ?t)))
+        of WATCHING  (do (curator-watching (:Screen ?t))
+                         (tell ?sender ($ [WATCHED :Screen (:Screen ?t)])))
+        else
+          (trace ($ "[Curator] unknown tuple: " (top ?t)))))
+
+    (setting Curator Curator :Delay)
+    {curating})
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §11  THE FEEDS
+  ;;;
+  ;;; Written the same way portal.theory writes a learner's, and to
+  ;;; the same folder, so the dashboard polls one place for both.
+  ;;;
+  ;;; THE PREFIX SAYS WHOSE.  A learner's feeds are portal-*.json and
+  ;;; the dashboard's are curator-*.json, because a screen showing a
+  ;;; learner's percepts beside the dashboard's own record must never
+  ;;; leave a reader guessing which is which.
+  ;;;
+  ;;; AND EVERY FEED CARRIES THE ADAPTER.  What is lost on restart
+  ;;; depends on it, and an injections list that silently starts
+  ;;; empty looks like a dashboard that has sent nothing — a claim
+  ;;; about the mind rather than about the configuration.
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (var ?*CURATOR-SCREEN* none)
+
+  (function curator-watching {literal ?screen}
+    (set ?*CURATOR-SCREEN* ?screen)
+    ?screen)
+
+
+  (function curator-path {literal ?name}
+    ($$ (setting Curator Curator :Log) "curator-" (string ?name) ".json"))
+
+
+  (function curator-write {literal ?name string ?json}
+    "Atomically — the dashboard polls these and parses whatever it
+     finds the moment it appears."
+    (var ?path (curator-path ?name))
+    (var ?tmp  ($$ ?path ".tmp"))
+    (var ?f    (file ?tmp))
+    (write ?f ?json)
+    (close ?f)
+    (move ?tmp ?path)
+    ?path)
+
+
+  (function c-str {?v}  ($$ "\"" (string ?v) "\""))
+  (function c-num {?v}  (string ?v))
+  (function c-pair {literal ?k string ?v} ($$ "\"" (string ?k) "\":" ?v))
+  (function c-object {list ?ps} ($$ "{" (join ?ps ",") "}"))
+  (function c-array {list ?is}  ($$ "[" (join ?is ",") "]"))
+
+
+  (function curator-learners {}
+    (var ?rows {})
+    (with [Learner :Id as ?id :Name as ?n :Home as ?h :Being as ?b
+                   :Record as ?rec :Registrar as ?reg :Totality as ?tot
+                   :Born as ?born :Seen as ?seen]
+      do
+      (set ?rows (adjoin ?rows
+        (c-object {(c-pair id        (c-str ?id))
+                   (c-pair name      (c-str ?n))
+                   (c-pair home      (c-str ?h))
+                   (c-pair being     (c-str ?b))
+                   (c-pair record    (c-str ?rec))
+                   (c-pair registrar (c-str ?reg))
+                   (c-pair totality  (c-str ?tot))
+                   (c-pair born      (c-str ?born))
+                   (c-pair seen      (c-str ?seen))}))))
+    (curator-write learners
+      (c-object {(c-pair adapter  (c-str (setting Curator Curator :Adapter)))
+                 (c-pair learners (c-array ?rows))})))
+
+
+  (function curator-injections {}
+    (var ?rows {})
+    (var ?cap (default (setting Curator Curator :History) 200))
+    (with [Injection :Learner as ?l :Head as ?h :Tuple as ?t
+                     :Whom as ?w :Answer as ?a :Screen as ?s :Moment as ?at]
+          sort ?cap
+      do
+      (set ?rows (adjoin ?rows
+        (c-object {(c-pair learner (c-str ?l))
+                   (c-pair head    (c-str ?h))
+                   (c-pair tuple   (c-str ?t))
+                   (c-pair whom    (c-str ?w))
+                   (c-pair answer  (c-str ?a))
+                   (c-pair screen  (c-str ?s))
+                   (c-pair moment  (c-str ?at))}))))
+    (curator-write injections
+      (c-object {(c-pair adapter (c-str (setting Curator Curator :Adapter)))
+                 (c-pair rows    (c-array ?rows))})))
+
+
+  (function curator-signals {}
+    (var ?rows {})
+    (with [Signal :Learner as ?l :Sent as ?s :Expect as ?e :Match as ?m
+                  :Deadline as ?d :Units as ?u :Met as ?met :Got as ?g
+                  :Latency as ?lat :Moment as ?at]
+      do
+      (set ?rows (adjoin ?rows
+        (c-object {(c-pair learner  (c-str ?l))
+                   (c-pair sent     (c-str ?s))
+                   (c-pair expect   (c-str ?e))
+                   (c-pair match    (c-str ?m))
+                   (c-pair deadline (c-num ?d))
+                   (c-pair units    (c-str ?u))
+                   (c-pair met      (c-str ?met))
+                   (c-pair got      (c-str ?g))
+                   (c-pair latency  (c-num ?lat))
+                   (c-pair moment   (c-str ?at))}))))
+    (curator-write signals (c-array ?rows)))
+
+
+  (function curator-notices {}
+    (var ?rows {})
+    (with [Notice :Learner as ?l :Kind as ?k :Detail as ?d :Moment as ?at]
+      do
+      (set ?rows (adjoin ?rows
+        (c-object {(c-pair learner (c-str ?l))
+                   (c-pair kind    (c-str ?k))
+                   (c-pair detail  (c-str ?d))
+                   (c-pair moment  (c-str ?at))}))))
+    (curator-write notices (c-array ?rows)))
+
+
+  (function curator-runs {}
+    (var ?rows {})
+    (with [Run :Learner as ?l :World as ?w :Opened as ?o :Closed as ?c
+               :Levels as ?lv :Actions as ?a :Outcome as ?out
+               :Profile as ?prof]
+      do
+      (set ?rows (adjoin ?rows
+        (c-object {(c-pair learner (c-str ?l))
+                   (c-pair world   (c-str ?w))
+                   (c-pair opened  (c-str ?o))
+                   (c-pair closed  (c-str ?c))
+                   (c-pair levels  (c-num ?lv))
+                   (c-pair actions (c-num ?a))
+                   (c-pair outcome (c-str ?out))
+                   (c-pair profile (c-str ?prof))}))))
+    (curator-write runs (c-array ?rows)))
+
+
+  (function curator-pass {}
+    "Write the feed for whatever is being watched.
+
+     The roster goes every pass regardless, because the Learner
+     screen is not the only one that needs to know which mind is
+     answering — every other screen is about a particular learner
+     and none of them should have to ask twice."
+    (curator-learners)
+    (case ?*CURATOR-SCREEN*
+      of learner    (curator-notices)
+      of signals    (curator-signals)
+      of attempts   (curator-injections)
+      of runs       (do (curator-runs) (curator-injections))
+      else          nil))
+
+
+  ;;; ═════════════════════════════════════════════════════════════
+  ;;; §12  START
+  ;;; ═════════════════════════════════════════════════════════════
+
+  (function curate {}
+    "Open the dashboard's knowledge base and start the Curator.
+
+     ITS OWN KB, AT ITS OWN URL, WITH ITS OWN ADAPTER.  Not any
+     learner's Totality: learner A's cannot be the registry for B
+     without making A special, and A being down would hide B.
+     Whether it is memory or a database is the deployment's business
+     and is read from the registry."
+    (use (lore url (setting Curator Curator :Kb)
+                   adapter (setting Curator Curator :Adapter))
+      (start Curator)
+      (trace ($ "[Curator] " (setting Curator Curator :Adapter)
+                " at " (setting Curator Curator :Kb)))
+      curating))
+
+
+) ;; end theory Curator
+
+;; ---------------  end of file -----------------

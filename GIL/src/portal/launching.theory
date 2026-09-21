@@ -1,0 +1,106 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; launching.theory — starting things outside Premise.
+;;;
+;;; ══════════════════════════════════════════════════════════════════
+;;;
+;;;   THE SHELL HELPERS BOTH SIDES NEED, AND NOTHING ELSE.
+;;;
+;;;   A learner starts its own device.  The dashboard starts the
+;;;   Curator, the feed and the server.  Neither may require the
+;;;   other's file — dashboard.theory ENDS WITH (dashboard-run), so
+;;;   requiring it from a learner would start a dashboard inside every
+;;;   mind — and both need the same three helpers.
+;;;
+;;;   So the helpers live here, where either may require them and
+;;;   neither runs anything by being required.  The rule is the one
+;;;   gil_common.tsx follows: anything used by more than one belongs
+;;;   in common, anything used by one belongs with it.
+;;;
+;;;   NOTHING IN THIS FILE STARTS ANYTHING.  It is required, not run.
+;;;
+;;; *************************************************************************************
+
+(theory Launching {1 0 0}
+
+  "Launching — shell helpers for whoever is starting something."
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §1  THIS LEARNER
+  ;;;
+  ;;; A learner knows itself and nothing of its siblings.  The roster
+  ;;; of every learner lives in the dashboard's knowledge base,
+  ;;; because a learner has no need of one — and it is not the
+  ;;; learner that wants to compare two campaigns.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function learner-slot {literal ?slot}
+    "One slot of this learner's own row."
+    (setting GIL Learner ?slot))
+
+
+  (function learner-root {}
+    "This learner's tree root.
+
+     Empty means the daicho is silent, and a command built on an
+     empty root would run against whatever directory the evaluator
+     started in — so say so rather than guess."
+    (var ?root (learner-slot :Home))
+    (if (null-p ?root)
+        (do (trace "[Launching] no [Learner :Home] — commands have no root.")
+            "")
+        ?root))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §2  RUNNING SOMETHING IN THE TREE
+  ;;;
+  ;;; EACH (%) IS ITS OWN SHELL, so `cd` does not carry:
+  ;;;
+  ;;;     (% "cd src/portal")   starts, changes directory, exits
+  ;;;     (% "npm install")     a NEW shell, back where it started
+  ;;;
+  ;;; (%%) runs them in ONE shell, so the cd carries — and it stops
+  ;;; at the first non-zero result, which keeps a command from
+  ;;; running in whatever folder the session happened to be in when
+  ;;; the cd failed.
+  ;;;
+  ;;; A ROOT IS A PLACE TO RUN SOMETHING, NOT A PREFIX TO PUT ON IT.
+  ;;; This was a string concatenation once, and produced
+  ;;;
+  ;;;     g:/…/1.0/gil/python pkg/eidos/arc/listen.py
+  ;;;
+  ;;; which is not a command at all.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function in-tree {string ?command}
+    "Run one command with the tree root as the working directory."
+    (%% ($$ "cd \"" (learner-root) "\"") ?command))
+
+
+  (function in-tree-at {string ?where string ?command}
+    "Run one command somewhere else in the tree.
+
+     For the cases where the root is not the right directory — npm
+     wants the folder holding its package.json, not the tree above
+     it."
+    (%% ($$ "cd \"" ?where "\"") ?command))
+
+
+) ;; end theory Launching
+
+;; ---------------  end of file -----------------

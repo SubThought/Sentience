@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GIL Portal",
+  "version": "3.0.0",
+  "identifier": "com.subthought.gil.portal",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../../../etc/log/portal"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "GIL 3.0 — Portal",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1024,
+        "minHeight": 720,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "copyright": "Copyright (c) 2026 SubThought Corp. All Rights Reserved.",
+    "icon": ["icons/icon.png"]
+  }
+}

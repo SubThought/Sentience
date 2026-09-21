@@ -1,0 +1,608 @@
+;;; *************************************************************************************
+;;;
+;;;  Copyright(c) 2013-2026 SubThought Corporation. All Rights Reserved.
+;;;
+;;;  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+;;;  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;;;  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+;;;
+;;;  IN NO EVENT SHALL THE AUTHOR(S) OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+;;;  DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+;;;  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR OTHER
+;;;  DEALINGS IN THE SOFTWARE.
+;;;
+;;; *************************************************************************************
+;;;
+;;; portal.theory — the mind's half of the audit surface.
+;;;
+;;; TWO WAYS TO SEE A MIND, AND BOTH ARE NEEDED.
+;;;
+;;;   MESSAGES   what crossed the boundary.  Already covered: the
+;;;              psyche writes one file per message and etc/feed
+;;;              turns them into JSON.  Nothing here duplicates that.
+;;;
+;;;   THE KB     what the mind HOLDS.  A message says what was said;
+;;;              the Totality says what was concluded, and they are
+;;;              not the same.  An attempt that was dispatched and an
+;;;              Attempt row marked Late are two different facts, and
+;;;              only the second is the mind's own view of itself.
+;;;
+;;; This theory is the second.  It reads the six memory areas and
+;;; writes what the screens need, and it answers the questions a
+;;; polled file cannot — a search over Cases, a canvas by label.
+;;;
+;;; POLLED ONLY WHILE WATCHED.  An unwatched screen costs nothing: the
+;;; portal says which screen is displayed, and this writes that feed
+;;; and no other.  Walking the whole activation space once a second
+;;; for a screen nobody has open is work taken from the mind itself.
+;;;
+;;; THE FEEDS SIT BESIDE THE BUILD, NOT INSIDE IT.  vite sets
+;;; emptyOutDir, so anything in etc/log/portal is deleted on every
+;;; build.  etc/log/portal-*.json survives.
+;;;
+;;; (Written to replace render.theory, which came from μ-GIL 1.0,
+;;; queried relations this Totality does not declare, and was loaded
+;;; by nothing.)
+;;;
+;;; *************************************************************************************
+
+(theory Portal {1 0 0}
+
+  "Portal — the Totality, as the dashboard reads it."
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §1  WHERE THE FEEDS GO
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-path {literal ?name}
+    "etc/log/portal-<name>.json, under the configured root."
+    ($$ (setting GIL Paths :Root) "etc/log/portal-" (string ?name) ".json"))
+
+
+  (function portal-write {literal ?name string ?json}
+    "Write a feed ATOMICALLY.
+
+     The portal polls these and parses whatever it finds the moment it
+     appears, so a direct write lets it read half a document — which
+     is a parse error rather than a retry, and the screen falls back
+     to its fixture and looks like a stalled mind."
+    (var ?path (portal-path ?name))
+    (var ?tmp  ($$ ?path ".tmp"))
+    (var ?f    (file ?tmp))
+    (write ?f ?json)
+    (close ?f)
+    (move ?tmp ?path)
+    ?path)
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §2  JSON, BY HAND
+  ;;;
+  ;;; Small and deliberate.  A general serialiser would have to decide
+  ;;; what a monad looks like in JSON, and that decision belongs to
+  ;;; whoever writes each feed — a monad is an identity, and printing
+  ;;; it as a number in one feed and a string in another is how a
+  ;;; screen ends up unable to match two views of the same thing.
+  ;;;
+  ;;; MONADS GO OUT AS STRINGS.  JSON numbers are doubles, and a
+  ;;; 128-bit identity does not survive one.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function j-str {?v}
+    ($$ "\"" (string ?v) "\""))
+
+  (function j-num {?v}
+    (string ?v))
+
+  (function j-monad {?m}
+    (j-str ?m))
+
+  (function j-pair {literal ?k string ?v}
+    ($$ "\"" (string ?k) "\":" ?v))
+
+  (function j-object {list ?pairs}
+    ($$ "{" (join ?pairs ",") "}"))
+
+  (function j-array {list ?items}
+    ($$ "[" (join ?items ",") "]"))
+
+  (function j-strings {list ?items}
+    (var ?out {})
+    (for ?i in ?items (set ?out (adjoin ?out (j-str ?i))))
+    (j-array ?out))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §3  ACTIVATIONS
+  ;;;
+  ;;; One row per active monad, at its Glue coordinate, with the
+  ;;; reality that lit it.
+  ;;;
+  ;;; GLUE COORDINATES MAY BE UNPLACED.  A Glue row is created with
+  ;;; its coordinates nil or zero and an agent places them afterwards.
+  ;;; Points at the origin are therefore the pre-placement state and
+  ;;; not a fault — the screen shows what the mind has arranged so
+  ;;; far, which is itself worth seeing.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-activations {}
+    (var ?rows {})
+    (with [Activation :M as ?m :Reality as ?r :Pulses as ?p
+                      :Window as ?w :Moment as ?at]
+      do
+      (var ?g (with [Glue :M = ?m :X as ?x :Y as ?y :Z as ?z]
+                give (idiom :X ?x :Y ?y :Z ?z)))
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair m       (j-monad ?m))
+                   (j-pair reality (j-str ?r))
+                   (j-pair pulses  (j-num ?p))
+                   (j-pair window  (j-num ?w))
+                   (j-pair label   (j-str (label-of ?m)))
+                   (j-pair x       (j-num (default (:X ?g) 0)))
+                   (j-pair y       (j-num (default (:Y ?g) 0)))
+                   (j-pair z       (j-num (default (:Z ?g) 0)))
+                   (j-pair placed  (if (null-p ?g) "false" "true"))
+                   (j-pair moment  (j-str ?at))}))))
+    (portal-write activations (j-array ?rows)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §4  ONTOLOGY — FOR THE ACTIVATED MONADS
+  ;;;
+  ;;; Not the whole heterarchy.  The lit subgraph: what is active, and
+  ;;; what each active scheme points at and is pointed at by.
+  ;;;
+  ;;; The whole ontology is the wrong picture for a running mind — it
+  ;;; is mostly dormant, and a graph of everything shows you nothing
+  ;;; about what is happening.  Activation selects; ontology renders.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-ontology {}
+    (var ?nodes {})
+    (var ?edges {})
+    (with [Activation :M as ?m] do
+      (with [Scheme :M = ?m :R as ?r :A as ?aff :E as ?eff] do
+
+        (set ?nodes (adjoin ?nodes
+          (j-object {(j-pair m     (j-monad ?m))
+                     (j-pair r     (j-str ?r))
+                     (j-pair label (j-str (label-of ?m)))
+                     (j-pair tier  (j-num (tier-for ?r)))
+                     (j-pair apex  (if (= (# ?eff) 0) "true" "false"))})))
+
+        ;;; afferent — the arguments that bear on this scheme
+        (for ?a in ?aff
+          (set ?edges (adjoin ?edges
+            (j-object {(j-pair from (j-monad ?a))
+                       (j-pair to   (j-monad ?m))
+                       (j-pair kind (j-str afferent))}))))
+
+        ;;; efferent — what it disperses to
+        (for ?e in ?eff
+          (set ?edges (adjoin ?edges
+            (j-object {(j-pair from (j-monad ?m))
+                       (j-pair to   (j-monad ?e))
+                       (j-pair kind (j-str efferent))}))))))
+
+    (portal-write ontology
+      (j-object {(j-pair nodes (j-array ?nodes))
+                 (j-pair edges (j-array ?edges))})))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §5  REMINDINGS
+  ;;;
+  ;;; Every probe, by every mechanism.  The Association screen is one
+  ;;; view of this — the Perceiver's own rows — and the general
+  ;;; question, what matched this, is the other.
+  ;;;
+  ;;; :MinScore travels WITH the row.  A score read a week later means
+  ;;; nothing without the bar it was judged against, and the bar is
+  ;;; per mechanism and measured as each comes up.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-remindings {}
+    (var ?rows {})
+    (var ?cap (default (setting GIL Perceiver :History) 50))
+    (var ?n 0)
+    (with [Reminding :Who as ?who :Relation as ?rel :Traits as ?traits
+                     :Outcome as ?out :Score as ?score :MinScore as ?bar
+                     :Case as ?case :Content as ?content :Count as ?count
+                     :Moment as ?at]
+          sort ?cap
+      do
+      (set ?n (+ ?n 1))
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair who      (j-str ?who))
+                   (j-pair relation (j-str ?rel))
+                   (j-pair traits   (j-strings ?traits))
+                   (j-pair outcome  (j-str ?out))
+                   (j-pair score    (j-num ?score))
+                   (j-pair minscore (j-num ?bar))
+                   (j-pair case     (j-monad ?case))
+                   (j-pair content  (j-monad ?content))
+                   (j-pair count    (j-num ?count))
+                   (j-pair moment   (j-str ?at))}))))
+    (portal-write remindings (j-array ?rows)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §6  COMPETENCIES
+  ;;;
+  ;;; Read from the Totality, never echoed from the toggle.  A screen
+  ;;; that showed what it last sent would show a competency as down
+  ;;; whether or not anything actually went down.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-competencies {}
+    (var ?rows {})
+    (with [Competency :Name as ?n :Component as ?c :Mechanisms as ?mechs
+                      :Enabled as ?e :Status as ?s :Since as ?at]
+      do
+      ;;; each mechanism with its own actor state, so a competency
+      ;;; that is half up is visibly half up
+      (var ?ms {})
+      (for ?m in ?mechs
+        (var ?life (with [Actor :Name = ?m :Lifecycle as ?l] give ?l))
+        (var ?kind (with [Actor :Name = ?m :Mechanism as ?k] give ?k))
+        (set ?ms (adjoin ?ms
+          (j-object {(j-pair name (j-str ?m))
+                     (j-pair kind (j-str (default ?kind rule)))
+                     (j-pair life (j-str (default ?life idle)))}))))
+
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair name       (j-str ?n))
+                   (j-pair component  (j-str ?c))
+                   (j-pair mechanisms (j-array ?ms))
+                   (j-pair enabled    (if (= ?e yes) "true" "false"))
+                   (j-pair status     (j-str ?s))
+                   (j-pair since      (j-str ?at))}))))
+    (portal-write competencies (j-array ?rows)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7  CANVASES
+  ;;;
+  ;;; Three modes, and the feed serves all three: the list is the
+  ;;; feed, `live` is the most activated row in it, and `find` is a
+  ;;; query (see §9) because a name the mind has never activated is
+  ;;; not in any bounded list.
+  ;;;
+  ;;; SORTED BY MONAD, DESCENDING.  Monads mint monotonically, so that
+  ;;; IS newest-first; there is no separate recency order to keep.
+  ;;;
+  ;;; ACTIVATION IS NOT RESTRICTED TO ONE REALITY.  A canvas rehearsed
+  ;;; in Imagined is exactly the one worth looking at, and confining
+  ;;; the screen to the current reality would hide it.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-canvases {}
+    (var ?rows {})
+    (var ?cap (default (setting GIL Portal :Canvases) 50))
+    (with [Canvas :M as ?m :Figments as ?figs :Taxeis as ?tax
+                  :Shots as ?shots :Venue as ?venue]
+          sort ?cap
+      do
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair m        (j-monad ?m))
+                   (j-pair label    (j-str (label-of ?m)))
+                   (j-pair venue    (j-monad ?venue))
+                   (j-pair figments (j-num (# ?figs)))
+                   (j-pair taxeis   (j-num (# ?tax)))
+                   (j-pair shots    (j-num (# ?shots)))
+                   (j-pair pulses   (j-num (canvas-pulses ?m)))
+                   (j-pair reality  (j-str (canvas-reality ?m)))}))))
+    (portal-write canvases (j-array ?rows)))
+
+
+  (function canvas-pulses {long ?m}
+    "Total activation across ALL realities.  Salience is salience
+     wherever it arose."
+    (var ?total 0)
+    (with [Activation :M = ?m :Pulses as ?p] do (set ?total (+ ?total ?p)))
+    ?total)
+
+
+  (function canvas-reality {long ?m}
+    "The reality that lit it most — a badge, not a filter."
+    (var ?best nil)
+    (var ?high -1)
+    (with [Activation :M = ?m :Reality as ?r :Pulses as ?p] do
+      (when (> ?p ?high) (set ?high ?p) (set ?best ?r) nil))
+    (default ?best none))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7b  THE MAP
+  ;;;
+  ;;; The spatial ladder, as the mind has actually built it —
+  ;;; Scene, Venue, Locale, Place, Area, Region, Map — with what
+  ;;; each rung holds and which landmark identifies it.
+  ;;;
+  ;;; THE SHAPE IS THE DIAGNOSIS.  A ladder with one Region and one
+  ;;; Map and four hundred Venues is a mind whose chunking is not
+  ;;; firing; one with four rungs populated and three empty is a mind
+  ;;; that has not wandered far enough yet.  Those look identical
+  ;;; from the inside and quite different on a screen, which is the
+  ;;; whole reason for this feed.
+  ;;;
+  ;;; AND IT IS WHERE THE LEVEL-2 QUESTION LIVES.  μ-GIL planned at
+  ;;; Place granularity with no Locale above it — forty single steps
+  ;;; whose value no bounded walk could see.  Whether GIL's ladder
+  ;;; actually populates is the thing that has to be true before any
+  ;;; of the rest matters, and this is where it becomes visible.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function rung-rows {literal ?name ?rel}
+    "Every scheme at one rung, with what it holds."
+    (var ?rows {})
+    (with [Scheme :M as ?m :R = ?rel :A as ?members] do
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair m         (j-monad ?m))
+                   (j-pair rung      (j-str ?name))
+                   (j-pair label     (j-str (label-of ?m)))
+                   (j-pair members   (j-num (# ?members)))
+                   (j-pair holds     (j-array (monad-list ?members)))
+                   (j-pair landmark  (j-str (landmark-of ?m)))
+                   (j-pair pulses    (j-num (total-pulses ?m)))}))))
+    ?rows)
+
+
+  (function monad-list {list ?ms}
+    (var ?out {})
+    (for ?m in ?ms (set ?out (adjoin ?out (j-monad ?m))))
+    ?out)
+
+
+  (function landmark-of {long ?locale}
+    "The figment that identifies this rung, or empty.
+
+     Only a Locale has one.  A landmark is a way to identify a
+     locale, and the rungs above are chunks of what was found
+     together — the grouping IS the identity, and nothing separate
+     names it."
+    (var ?fig
+      (with [Scheme :R = (R Landmark) :A as ?args :E as ?refs]
+            (in ?locale ?refs)
+        give (@ ?args 1)))
+    (if (null-p ?fig) "" (string ?fig)))
+
+
+  (function total-pulses {long ?m}
+    "Activation across all realities — how lit this rung is now."
+    (var ?total 0)
+    (with [Activation :M = ?m :Pulses as ?p] do (set ?total (+ ?total ?p)))
+    ?total)
+
+
+  (function portal-map {}
+    (var ?rungs {})
+    (for ?pair in {{Scene  (R Scene)}  {Venue  (R Venue)}
+                   {Locale (R Locale)} {Place  (R Place)}
+                   {Area   (R Area)}   {Region (R Region)}
+                   {Map    (R Map)}}
+      (var ?name (@ ?pair 1))
+      (var ?rel  (@ ?pair 2))
+      (var ?rows (rung-rows ?name ?rel))
+      (set ?rungs (adjoin ?rungs
+        (j-object {(j-pair rung  (j-str ?name))
+                   (j-pair count (j-num (# ?rows)))
+                   (j-pair rows  (j-array ?rows))}))))
+
+    ;;; the landmarks in their own right, so the screen can show what
+    ;;; identifies what without walking every rung to find out
+    (var ?marks {})
+    (with [Scheme :M as ?lm :R = (R Landmark) :A as ?args :E as ?refs] do
+      (set ?marks (adjoin ?marks
+        (j-object {(j-pair m       (j-monad ?lm))
+                   (j-pair figment (j-monad (@ ?args 1)))
+                   (j-pair locale  (j-monad (@ ?refs 1)))
+                   (j-pair label   (j-str (label-of (@ ?args 1))))}))))
+
+    (portal-write map
+      (j-object {(j-pair rungs     (j-array ?rungs))
+                 (j-pair landmarks (j-array ?marks))})))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7c  STAGINGS
+  ;;;
+  ;;; One row per pass through the six roles, with which roles have
+  ;;; run and what SetDesigner decided.
+  ;;;
+  ;;; THE ROLES ARE RECORDED NOW, NOT INFERRED.  Progress used to be
+  ;;; deducible only from which Taxis slots had been filled — which
+  ;;; the rules test for themselves, and which the portal would have
+  ;;; had to re-derive in TypeScript, where it would drift from the
+  ;;; rules the first time one changed.
+  ;;;
+  ;;; :Tier IS THE MOST INFORMATIVE FACT ABOUT A STAGING: whether the
+  ;;; mind recognised the place, adapted a remembered one, or built it
+  ;;; from nothing.  It was decided and discarded.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-stagings {}
+    (var ?rows {})
+    (with [Staging :M as ?m :Taxis as ?taxis :Scene as ?scene
+                   :Roles as ?roles :Tier as ?tier :Score as ?score
+                   :Since as ?since]
+      do
+      (set ?rows (adjoin ?rows
+        (j-object {(j-pair m      (j-monad ?m))
+                   (j-pair taxis  (j-monad ?taxis))
+                   (j-pair scene  (j-monad ?scene))
+                   (j-pair roles  (j-strings ?roles))
+                   (j-pair tier   (j-str (default ?tier "")))
+                   (j-pair score  (j-num ?score))
+                   (j-pair since  (j-str ?since))}))))
+    (portal-write stagings (j-array ?rows)))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §7d  THE LEARNER
+  ;;;
+  ;;; Which mind this is, and what it is attached to.
+  ;;;
+  ;;; A LEARNER IS A DISTINCT MIND — its own Totality, its own
+  ;;; Registrar, its own record.  This says which one is answering,
+  ;;; so a dashboard showing two cannot confuse them, and so an
+  ;;; operator can see when two are attached to one Totality.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-learner {}
+    (var ?who (setting GIL Learners :Active))
+    (var ?home (with [Learner :Id = ?who :Home as ?h] give ?h))
+    (var ?nice (with [Learner :Id = ?who :Name as ?n] give ?n))
+    (portal-write learner
+      (j-object {(j-pair name      (j-str (setting GIL Mind :Name)))
+                 (j-pair version   (j-str (setting GIL Mind :Version)))
+                 (j-pair learner   (j-str (default ?nice ?who)))
+                 (j-pair id        (j-str ?who))
+                 (j-pair totality  (j-str (setting GIL Totality :Url)))
+                 (j-pair registrar (j-str (setting GIL Registrar :Url)))
+                 (j-pair perceiver (j-str (setting GIL Perceiver :Url)))
+                 (j-pair executor  (j-str (setting GIL Executor :Url)))
+                 (j-pair home      (j-str (default ?home "")))
+                 (j-pair moment    (j-str (moment)))})))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §8  THE PASS
+  ;;;
+  ;;; ONE SCREEN, ONE FEED.  The portal says what it is showing; this
+  ;;; writes that and nothing else.  A mind spending its cycles
+  ;;; serialising six views for a browser showing one is a mind with
+  ;;; less attention for the world.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (var ?*PORTAL-SCREEN* none)
+
+  (function portal-watching {literal ?screen}
+    "Told by the portal, through the one door, which screen is up."
+    (set ?*PORTAL-SCREEN* ?screen)
+    ?screen)
+
+  (function portal-pass {}
+    "Write the feed for whatever is being watched."
+    (case ?*PORTAL-SCREEN*
+      of activations  (portal-activations)
+      of ontology     (portal-ontology)
+      of association  (portal-remindings)
+      of competencies (portal-competencies)
+      of imagination  (portal-canvases)
+      of mapper       (do (portal-map) (portal-stagings))
+      of learner      (portal-learner)
+      else            nil))
+
+
+  (agent Portal
+    (function {}
+      (when (cancelled-p (self)) (exit yes))
+      (portal-pass))
+    (setting GIL Portal :Url)
+    (function {?sender ?message}
+      (var ?t (parse ?message))
+      (case (top ?t)
+        of WATCHING
+          (do (portal-watching (:Screen ?t))
+              (tell ?sender ($ [WATCHED :Screen (:Screen ?t)])))
+        of QUERY
+          (tell ?sender ($ (portal-query ?t)))
+        of LEARNER
+          ; STARTING A SIBLING MIND.
+          ;
+          ; A learner that is not running cannot be asked anything,
+          ; so this only ever reaches a mind that IS running, asking
+          ; it to start another.  Starting the first is the command
+          ; line's job, and nothing here pretends otherwise.
+          ;
+          ; BY :Id — the identifier the roster names, not the display
+          ; name an operator reads.
+          (tell ?sender ($ (spawn-learner (:Id ?t))))
+        else
+          (trace ($ "[Portal] unknown tuple: " (top ?t)))))
+    (setting GIL Portal :Delay)
+    {rendering})
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §9  QUERIES
+  ;;;
+  ;;; What a polled file cannot answer.  A search is a question the
+  ;;; screen asks once, about something that may not be in any bounded
+  ;;; feed — a Case among thousands, a canvas by a label the mind has
+  ;;; not activated lately.
+  ;;;
+  ;;;   [QUERY :Of Case   :Traits {…} :MinScore 0.9 :Limit 10]
+  ;;;   [QUERY :Of Case   :Case <id>]
+  ;;;   [QUERY :Of Canvas :Label "…"]  |  [QUERY :Of Canvas :M <monad>]
+  ;;;
+  ;;; THE PROBE GOES THROUGH THE MATCHER, not through a private
+  ;;; comparison.  A search screen that scored differently from the
+  ;;; mind would be showing what a different mind would have recalled.
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function portal-query {?q}
+    (case (:Of ?q)
+      of Case   (portal-query-case ?q)
+      of Canvas (portal-query-canvas ?q)
+      else      [ANSWER :Of (:Of ?q) :Status Unknown]))
+
+
+  (function portal-query-case {?q}
+    "By id, or by trait probe.
+
+     THE BAR COMES FROM THE QUERY, and where the query is silent it is
+     1.0 — exact identity.  A search that quietly used some other
+     mechanism's threshold would report recalls the mind would never
+     have made."
+    (var ?id (:Case ?q))
+    (if (not (null-p ?id))
+        (with [Case :Case = ?id :R as ?r :Content as ?c :Traits as ?tr]
+          give [ANSWER :Of Case :Case ?id :R ?r :Content ?c :Traits ?tr])
+     else
+        (do
+          (var ?bar (default (:MinScore ?q) 1.0))
+          (var ?lim (default (:Limit ?q) 10))
+          (var ?matches
+            (probe :R (:R ?q) :Traits (:Traits ?q)
+                   :MinScore ?bar :Limit ?lim))
+          [ANSWER :Of Case :Matches ?matches
+                  :MinScore ?bar :Moment (moment)])))
+
+
+  (function portal-query-canvas {?q}
+    "By monad, or by label.
+
+     Label resolves through the Lexeme mapping, the same way the
+     Activation and Ontology find boxes resolve one — so a name typed
+     on one screen means the same thing on all of them."
+    (var ?m (:M ?q))
+    (when (null-p ?m)
+      (set ?m (L (:Label ?q))))
+    (if (null-p ?m)
+        [ANSWER :Of Canvas :Status Unknown :Label (:Label ?q)]
+        (with [Canvas :M = ?m :Figments as ?f :Taxeis as ?t
+                      :Shots as ?s :Venue as ?v]
+          give [ANSWER :Of Canvas :M ?m :Figments ?f
+                       :Taxeis ?t :Shots ?s :Venue ?v])))
+
+
+  ;;; ─────────────────────────────────────────────────────────────
+  ;;; §10  LABELS
+  ;;; ─────────────────────────────────────────────────────────────
+
+  (function label-of {long ?m}
+    "A monad's label, or empty.
+
+     Below the autogenous threshold a monad has no label and that is
+     not a defect — most of what a mind holds was never named by
+     anyone.  The screens show the monad in that case, which is the
+     honest thing to show."
+    (default (with [Lexeme :M = ?m :Label as ?l] give ?l) ""))
+
+
+) ;; end theory Portal
+
+;; ---------------  end of file -----------------
