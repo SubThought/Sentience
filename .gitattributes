@@ -1,0 +1,13 @@
+*.theory   linguist-language=Premise
+*.module   linguist-language=Premise
+*.package  linguist-language=Premise
+*.psyche   linguist-language=Premise
+*.suites   linguist-language=Premise
+*.being    linguist-language=Premise
+*.process  linguist-language=Premise
+*.memory   linguist-language=Premise
+*.pattern  linguist-language=Premise
+
+doc/*      linguist-documentation
+eg/*       linguist-documentation
+*.md       linguist-detectable=false
